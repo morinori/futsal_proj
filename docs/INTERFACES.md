@@ -1,13 +1,47 @@
 # Interface Inventory
 
-## Data Contracts
-- Summarize request/response payloads, schema fields, and validation requirements.
+## 서비스 레이어
+- `AttendanceService`
+  - `create_attendance_for_match(match_id)` : 경기 생성 후 선수별 출석 레코드 생성.
+  - `update_player_status(match_id, player_id, status)` : 출석 상태 변경 (`present|absent|pending`).
+  - `get_match_attendance(match_id)` : 관리자용 상세 리스트 반환.
+- `MatchService`
+  - `create_match(data)` / `update_match(data)` / `delete_match(match_id)` : 경기 CRUD.
+  - `get_month_schedule(year, month)` : 월별 경기 목록.
+- `VideoService`
+  - `process_video_complete(uploaded_file, video_id)` : 저장 → 트랜스코딩 → 썸네일까지 전체 파이프라인.
+  - `transcode_to_hls(video_path, video_id)` : FFmpeg 호출로 HLS 스트림 생성.
+  - `generate_thumbnail(video_path, video_id)` : 썸네일 이미지 생성.
+- `AuthService`
+  - `login(username, password)` : bcrypt 검증 후 관리자 정보 반환.
+  - `create_admin(...)`, `change_password(...)`, `deactivate_admin(...)` : 관리자 계정 관리.
 
-## Services & APIs
-- Outline service entry points, dependencies, and side effects.
+## 리포지토리 레이어
+- `MatchRepository`, `PlayerRepository`, `VideoRepository`, `FinanceRepository`, `AdminRepository` 등 모든 Repository는 `database/connection.py`의 `DatabaseManager`를 사용.
+  - `VideoRepository.get_completed_videos(limit=None)` : 완료된 영상 목록 (limit는 파라미터 바인딩 권장).
+  - `VideoRepository.update_processing_status(...)` : 상태/경로/재생시간 업데이트.
+  - `AdminRepository.get_by_username`, `update_last_login`, `update_password`, `deactivate`.
+- 규칙: UI/Service는 SQL을 직접 실행하지 않고 Repository를 통해 데이터에 접근해야 한다.
 
-## UI Boundaries
-- Document component responsibilities, state inputs, and emitted events.
+## UI 페이지 & 컴포넌트
+- `ui/pages/dashboard.py` : 지표 카드(`ui/components/metrics.py`) 및 요약.
+- `ui/pages/attendance.py` : 출석 카드, 상태 변경 버튼.
+- `ui/pages/video_upload.py` : 업로드 폼, 진행률 UI → `VideoService` 호출.
+- `ui/pages/video_gallery.py` : 필터 + 비디오 카드 그리드, `VideoRepository` 조회.
+- `ui/components/auth.py` : 로그인 폼, 관리자 드롭다운 (`require_admin_access`).
+- `ui/components/calendar.py` : 경기 일정 렌더링, 클릭 이벤트는 출석 페이지로 연결.
 
-## Integration Notes
-- Record assumptions about external systems, rate limits, or authentication flows.
+## 외부 연동 & 런타임 의존성
+- **Streamlit** : UI 프레임워크.
+- **FFmpeg/FFprobe** : `subprocess.run`으로 호출, Docker 이미지에 포함.
+- **Nginx** : `futsal.nginx.conf`에서 `/uploads/` 라우팅 및 MIME 설정.
+- **Docker (`run.sh`)** : 컨테이너 라이프사이클 관리, `/futsal_proj` 볼륨 공유.
+
+## 세션 및 상태
+- `st.session_state` 키: `current_page`, `is_admin`, `admin_*`, `admin_menu_expanded`, `last_activity` 등.
+- 파일 기반 세션(`utils/session_utils.py`)은 백업 용도로 유지되지만 기본 인증 흐름은 Streamlit 세션 중심.
+- URL 파라미터 기반 세션 복원은 금지 (`docs/vuln.md` 참고).
+
+## 보안 가드레일 링크
+- `docs/vuln.md` : 세션 복원, JS 직삽입, SQL LIMIT 등 취약점 대응.
+- `claude_guardrails.md` : docker compose 금지, git 워크플로, 배포 스크립트 사용 규칙.

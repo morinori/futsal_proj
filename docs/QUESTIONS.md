@@ -1,10 +1,16 @@
 # Open Questions
 
 ## Pending Clarifications
-- List outstanding requirements or design decisions awaiting stakeholder input.
+- 관리자 세션 복원을 토큰 기반으로 전환할 계획이 있는가? 구현 시 만료 정책/스토리지는 어디에 둘 것인가?
+- 동영상 업로드 실패 시 재시도 전략(자동/수동)과 알림 방식을 어떻게 정의할 것인가?
+- `services/video_service.py`의 트랜스코딩 타임아웃(기본 600초)을 조정할 필요가 있는가?
 
 ## Risks & Unknowns
-- Highlight assumptions that could impact schedule, quality, or scope.
+- 현재는 720p 단일 화질만 제공: 네트워크가 열악한 환경에서의 사용자 경험이 충분한가?
+- 파일 기반 세션(`utils/session_utils.py`)이 남아 있는데, 보안상 완전히 제거해도 되는지?
+- 업로드 디렉터리 정리(`purge_videos.sh`) 실행 시 백업 정책이 명확한가?
 
 ## Follow-Up Actions
-- Assign owners and deadlines for resolving each question.
+- 보안 토큰 기반 세션 설계 초안 작성 후 `docs/RFCs/`에 초안 추가.
+- 동영상 업로드 실패 로그 수집 범위 정의(필요 시 `docs/ADRs/` 추가).
+- `docs/ROADMAP.md` 항목별 책임자와 일정 확정 → GitHub Issue로 전환.

@@ -1,13 +1,31 @@
 # Test Plan
 
-## Scope
-- Define covered features, excluded areas, and target environments.
+## 테스트 범위
+- 관리자 인증, 경기/출석, 동영상 업로드, 재정 관리, 뉴스/갤러리 UI.
+- Docker 기반 배포 스크립트(`run.sh`)의 기본 동작 확인.
+- 민감 데이터가 커밋되지 않도록 `.gitignore` 확인.
 
-## Test Types
-- Unit, integration, UI, and manual scenarios mapped to responsible owners.
+## 테스트 유형
+- **단위 테스트 (pytest)**
+  - `services/attendance_service.py`: 출석 생성/상태 변경/요약.
+  - `services/video_service.py`: `validate_uploaded_file`, `transcode_to_hls` 실패 케이스 모킹.
+  - `services/auth_service.py`: bcrypt 검증, 비밀번호 변경.
+- **통합 테스트 (수동/스크립트)**
+  1. `./run.sh restart` 후 관리자 로그인 → 출석/경기/재정 페이지 접근.
+  2. 테스트용 동영상 업로드 → HLS 변환 완료 여부 확인 (`uploads/videos/hls/{id}`).
+  3. 갤러리 필터(특정 경기/정보 없음) 동작 확인.
+- **보안 회귀 테스트**
+  - 세션 URL 파라미터를 조작해도 관리자 권한이 부여되지 않아야 함.
+  - 동영상 메타데이터의 `r_frame_rate`에 악성 문자열을 넣어도 예외 처리되어야 함.
+  - JS 삽입 시 사용자 입력이 그대로 스크립트에 주입되지 않는지 확인.
 
-## Data & Fixtures
-- Note required seeds, migrations, or anonymized datasets for repeatable runs.
+## 데이터 및 픽스처
+- 단위 테스트는 인메모리 SQLite (`sqlite3.connect(':memory:')`) 또는 임시 파일 사용.
+- 샘플 관리자 계정/선수/경기 데이터는 `database/migrations.py`의 초기화 함수를 활용.
+- 동영상 테스트 시 작은 샘플 파일(수 초 길이)을 사용하고, 테스트 후 `uploads/` 정리.
 
-## Exit Criteria
-- Establish pass/fail thresholds, coverage targets, and sign-off checkpoints.
+## 종료 기준
+- 서비스 레이어 단위 테스트 커버리지 80% 이상.
+- `docs/vuln.md`에 기록된 취약점에 대한 회귀 테스트 통과.
+- `./run.sh restart` 시 앱이 정상 부팅하고 주요 페이지가 오류 없이 열릴 것.
+- 문서(`docs/CHANGELOG.md`, `docs/QUESTIONS.md`)가 최신 상태.
