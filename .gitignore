@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+
+# Streamlit artifacts
+.streamlit/
+
+# Databases & local storage
+*.db
+uploads/
+backup/
+/tmp/futsal_sessions/
+
+# Logs & temp
+*.log
+
+# Codex/Claude artifacts
+.claude/
+claudedocs/
+
+# IDE / misc
+*.swp
+.DS_Store

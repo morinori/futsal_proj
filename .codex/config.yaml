@@ -1,0 +1,5 @@
+# Codex CLI workspace configuration
+agents:
+  default:
+    profile: AGENT.md
+    instructions: instructions.md
