@@ -61,10 +61,22 @@ def init_complete_db():
                 match_time TEXT NOT NULL,
                 opponent TEXT DEFAULT '',
                 result TEXT DEFAULT '',
+                attendance_lock_minutes INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(field_id) REFERENCES fields(id)
             );
         """)
+
+        # 기존 테이블에 attendance_lock_minutes 컬럼 추가 (마이그레이션)
+        try:
+            cur.execute("ALTER TABLE matches ADD COLUMN attendance_lock_minutes INTEGER NOT NULL DEFAULT 0")
+            logger.info("Added attendance_lock_minutes column to matches table")
+        except sqlite3.OperationalError as e:
+            # 컬럼이 이미 존재하는 경우 무시
+            if "duplicate column" in str(e).lower():
+                logger.info("attendance_lock_minutes column already exists")
+            else:
+                raise
 
         # 출석 테이블
         cur.execute("""

@@ -10,12 +10,12 @@ class MatchRepository:
     def create(self, match: Match) -> bool:
         """경기 생성"""
         query = """
-            INSERT INTO matches (field_id, match_date, match_time, opponent, result)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO matches (field_id, match_date, match_time, opponent, result, attendance_lock_minutes)
+            VALUES (?, ?, ?, ?, ?, ?)
         """
         result = db_manager.execute_query(
             query,
-            (match.field_id, str(match.match_date), match.match_time, match.opponent, match.result)
+            (match.field_id, str(match.match_date), match.match_time, match.opponent, match.result, match.attendance_lock_minutes)
         )
         return result is not None and result > 0
 
@@ -109,12 +109,12 @@ class MatchRepository:
         """경기 정보 업데이트"""
         query = """
             UPDATE matches
-            SET field_id = ?, match_date = ?, match_time = ?, opponent = ?, result = ?
+            SET field_id = ?, match_date = ?, match_time = ?, opponent = ?, result = ?, attendance_lock_minutes = ?
             WHERE id = ?
         """
         result = db_manager.execute_query(
             query,
-            (match.field_id, str(match.match_date), match.match_time, match.opponent, match.result, match.id)
+            (match.field_id, str(match.match_date), match.match_time, match.opponent, match.result, match.attendance_lock_minutes, match.id)
         )
         return result is not None and result > 0
 
@@ -382,6 +382,16 @@ class NewsRepository:
         query = "SELECT * FROM news WHERE id = ?"
         result = db_manager.execute_query(query, (news_id,), fetch_all=False)
         return dict(result) if result else None
+
+    def update(self, news_id: int, title: str, content: str, author: str, pinned: bool, category: str) -> bool:
+        """소식 수정"""
+        query = """
+            UPDATE news
+            SET title = ?, content = ?, author = ?, pinned = ?, category = ?
+            WHERE id = ?
+        """
+        result = db_manager.execute_query(query, (title, content, author, pinned, category, news_id))
+        return result is not None and result > 0
 
 class GalleryRepository:
     """갤러리 데이터 액세스"""

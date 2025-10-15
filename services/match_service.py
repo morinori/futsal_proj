@@ -13,14 +13,15 @@ class MatchService:
         self.match_repo = match_repo
         self.field_repo = field_repo
 
-    def create_match(self, field_id: int, match_date: date, match_time: str, opponent: str = "") -> bool:
+    def create_match(self, field_id: int, match_date: date, match_time: str, opponent: str = "", attendance_lock_minutes: int = 0) -> bool:
         """경기 생성 (출석 상태 자동 생성 포함)"""
         # 데이터 검증
         validation_result = validate_match_data({
             'field_id': field_id,
             'match_date': match_date,
             'match_time': match_time,
-            'opponent': opponent
+            'opponent': opponent,
+            'attendance_lock_minutes': attendance_lock_minutes
         })
 
         if not validation_result.is_valid:
@@ -31,7 +32,8 @@ class MatchService:
             field_id=field_id,
             match_date=match_date,
             match_time=match_time,
-            opponent=opponent
+            opponent=opponent,
+            attendance_lock_minutes=attendance_lock_minutes
         )
 
         # 경기 생성
@@ -117,7 +119,7 @@ class MatchService:
 
         return False
 
-    def update_match(self, match_id: int, field_id: int, match_date: date, match_time: str, opponent: str = "", result: str = "") -> bool:
+    def update_match(self, match_id: int, field_id: int, match_date: date, match_time: str, opponent: str = "", result: str = "", attendance_lock_minutes: int = 0) -> bool:
         """경기 정보 업데이트"""
         # 데이터 검증
         validation_result = validate_match_data({
@@ -125,7 +127,8 @@ class MatchService:
             'match_date': match_date,
             'match_time': match_time,
             'opponent': opponent,
-            'result': result
+            'result': result,
+            'attendance_lock_minutes': attendance_lock_minutes
         })
 
         if not validation_result.is_valid:
@@ -138,7 +141,8 @@ class MatchService:
             match_date=match_date,
             match_time=match_time,
             opponent=opponent,
-            result=result
+            result=result,
+            attendance_lock_minutes=attendance_lock_minutes
         )
 
         return self.match_repo.update(updated_match)

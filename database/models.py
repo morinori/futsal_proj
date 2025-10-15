@@ -31,6 +31,7 @@ class Match:
     match_time: str
     opponent: str = ""
     result: str = ""
+    attendance_lock_minutes: int = 0
     id: Optional[int] = None
     created_at: Optional[str] = None
 

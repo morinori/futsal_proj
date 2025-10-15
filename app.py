@@ -162,9 +162,14 @@ st.markdown("""
     display: none !important;
 }
 
-/* 상단 여백 제거 */
+/* 상단 여백 - 상단바가 제목을 가리지 않도록 충분한 여백 확보 */
 .stMainBlockContainer {
-    padding-top: 1rem !important;
+    padding-top: 3rem !important;
+}
+
+/* 메인 콘텐츠 블록에 추가 여백 */
+.main .block-container {
+    padding-top: 2rem !important;
 }
 
 /* 모바일 최적화 - 사이드바 간섭 없음 */

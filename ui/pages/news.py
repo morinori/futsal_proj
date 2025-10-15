@@ -85,7 +85,9 @@ class NewsPage:
                     st.success("📌 고정됨")
 
             st.markdown("---")
-            st.markdown(news['content'])
+            # 개행 처리: \n을 <br>로 변환
+            content_with_br = news['content'].replace('\n', '<br>')
+            st.markdown(content_with_br, unsafe_allow_html=True)
 
 
     def render_news_summary(self) -> None:

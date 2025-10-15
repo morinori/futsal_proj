@@ -79,7 +79,21 @@ class SchedulePage:
 
             # 추가 정보
             st.markdown("**추가 정보**")
-            result = st.text_input("경기 결과 (선택사항)", placeholder="경기 후 입력")
+            col3, col4 = st.columns(2)
+
+            with col3:
+                result = st.text_input("경기 결과 (선택사항)", placeholder="경기 후 입력")
+
+            with col4:
+                # 출석 마감 시간 선택
+                lock_options = {
+                    "제한 없음": 0,
+                    "경기 30분 전": 30,
+                    "경기 60분 전": 60,
+                    "경기 90분 전": 90
+                }
+                selected_lock = st.selectbox("출석 마감", options=list(lock_options.keys()))
+                attendance_lock_minutes = lock_options[selected_lock]
 
             if st.form_submit_button("경기 추가", type="primary"):
                 if selected_field and match_date and selected_time:
@@ -94,7 +108,8 @@ class SchedulePage:
                                 field_id=field_id,
                                 match_date=match_date,
                                 match_time=selected_time,
-                                opponent=opponent or ""
+                                opponent=opponent or "",
+                                attendance_lock_minutes=attendance_lock_minutes
                             )
 
                             if success:
@@ -354,7 +369,27 @@ class SchedulePage:
                     key=f"edit_opponent_{match['id']}"
                 )
 
-            # 경기 결과 (새로 추가)
+            # 출석 마감 시간 선택
+            st.markdown("**출석 설정**")
+            lock_options = {
+                "제한 없음": 0,
+                "경기 30분 전": 30,
+                "경기 60분 전": 60,
+                "경기 90분 전": 90
+            }
+            current_lock_minutes = match.get('attendance_lock_minutes', 0)
+            current_lock_label = next((k for k, v in lock_options.items() if v == current_lock_minutes), "제한 없음")
+            current_lock_index = list(lock_options.keys()).index(current_lock_label)
+
+            selected_lock = st.selectbox(
+                "출석 마감",
+                options=list(lock_options.keys()),
+                index=current_lock_index,
+                key=f"edit_lock_{match['id']}"
+            )
+            attendance_lock_minutes = lock_options[selected_lock]
+
+            # 경기 결과
             st.markdown("**경기 결과**")
             col_result1, col_result2 = st.columns(2)
 
@@ -403,7 +438,8 @@ class SchedulePage:
                             match_date=match_date,
                             match_time=selected_time,
                             opponent=opponent or "",
-                            result=result or ""
+                            result=result or "",
+                            attendance_lock_minutes=attendance_lock_minutes
                         )
 
                         if success:

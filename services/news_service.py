@@ -156,5 +156,21 @@ class NewsService:
             }
         return None
 
+    def update_news(self, news_id: int, title: str, content: str, author: str,
+                   pinned: bool = False, category: str = "general") -> bool:
+        """소식 수정"""
+        # 데이터 검증
+        validation_result = validate_news_data({
+            'title': title,
+            'content': content,
+            'author': author,
+            'category': category
+        })
+
+        if not validation_result.is_valid:
+            raise ValueError(f"Invalid news data: {', '.join(validation_result.errors)}")
+
+        return self.news_repo.update(news_id, title, content, author, pinned, category)
+
 # 서비스 인스턴스
 news_service = NewsService()
