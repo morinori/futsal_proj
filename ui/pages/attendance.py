@@ -1,6 +1,5 @@
 """출석 관리 페이지"""
 import streamlit as st
-from typing import Optional
 from services.attendance_service import attendance_service
 from services.match_service import match_service
 from services.player_service import player_service
@@ -133,6 +132,11 @@ class AttendancePage:
             if st.button("다른 경기 보기", key="clear_selected_match"):
                 if 'selected_match_id' in st.session_state:
                     del st.session_state['selected_match_id']
+                if 'match_select_dropdown' in st.session_state:
+                    del st.session_state['match_select_dropdown']
+                personal_keys = [key for key in st.session_state.keys() if key.startswith('personal_match_select_')]
+                for key in personal_keys:
+                    del st.session_state[key]
                 st.rerun()
 
         with col_btn2:
@@ -151,24 +155,49 @@ class AttendancePage:
 
     def _render_match_attendance_tab(self) -> None:
         """경기별 출석 현황 탭"""
-        # 예정된 경기 목록
         upcoming_matches = self._get_upcoming_matches()
+        match_options = [
+            {
+                'label': f"{match['match_date']} {match['match_time']} - {match.get('field_name', '미정')}",
+                'id': match['id']
+            }
+            for match in upcoming_matches
+        ]
 
-        if not upcoming_matches:
+        if not match_options:
             st.info("예정된 경기가 없습니다.")
             return
 
-        # 경기 선택
-        match_options = {
-            f"{match['match_date']} {match['match_time']} - {match.get('field_name', '미정')}": match['id']
-            for match in upcoming_matches
-        }
+        # selectbox 기본값 설정
+        dropdown_key = 'match_select_dropdown'
+        current_index = st.session_state.get(dropdown_key)
+        if not isinstance(current_index, int):
+            current_index = None
 
-        selected_match = st.selectbox("경기 선택", options=list(match_options.keys()))
+        selected_match_id = st.session_state.get('selected_match_id')
+        match_index_for_selected = None
+        if selected_match_id is not None:
+            for idx, option in enumerate(match_options):
+                if option['id'] == selected_match_id:
+                    match_index_for_selected = idx
+                    break
 
-        if selected_match:
-            match_id = match_options[selected_match]
-            self._render_match_attendance_detail(match_id)
+        if match_index_for_selected is not None:
+            st.session_state[dropdown_key] = match_index_for_selected
+        elif current_index is None or current_index >= len(match_options):
+            st.session_state[dropdown_key] = 0
+
+        selected_index = st.selectbox(
+            "경기 선택",
+            options=list(range(len(match_options))),
+            format_func=lambda idx: match_options[idx]['label'],
+            key=dropdown_key
+        )
+
+        selected_match = match_options[selected_index]
+        st.session_state['selected_match_id'] = selected_match['id']
+        self._render_match_attendance_detail(selected_match['id'])
+
 
     def _render_personal_attendance_tab(self) -> None:
         """개인별 출석 관리 탭"""
@@ -221,22 +250,44 @@ class AttendancePage:
 
         # 경기 선택 드롭다운
         st.subheader("📅 경기 선택")
-        match_options = {
-            f"{match['match_date']} {match['match_time']} - {match.get('opponent', '팀내 경기')} @ {match.get('field_name', '미정')}": match['id']
+        match_options = [
+            {
+                'label': f"{match['match_date']} {match['match_time']} - {match.get('opponent', '팀내 경기')} @ {match.get('field_name', '미정')}",
+                'id': match['id']
+            }
             for match in upcoming_match_list
-        }
+        ]
 
-        selected_match_display = st.selectbox(
+        dropdown_key = f"personal_match_select_{player_id}"
+        current_index = st.session_state.get(dropdown_key)
+        if not isinstance(current_index, int):
+            current_index = None
+
+        selected_match_id = st.session_state.get('selected_match_id')
+        match_index_for_selected = None
+        if selected_match_id is not None:
+            for idx, option in enumerate(match_options):
+                if option['id'] == selected_match_id:
+                    match_index_for_selected = idx
+                    break
+
+        if match_index_for_selected is not None:
+            st.session_state[dropdown_key] = match_index_for_selected
+        elif current_index is None or current_index >= len(match_options):
+            st.session_state[dropdown_key] = 0
+
+        selected_index = st.selectbox(
             "참석할 경기를 선택하세요:",
-            options=list(match_options.keys()),
-            key=f"personal_match_select_{player_id}"
+            options=list(range(len(match_options))),
+            format_func=lambda idx: match_options[idx]['label'],
+            key=dropdown_key
         )
 
-        if selected_match_display:
-            selected_match_id = match_options[selected_match_display]
+        selected_match = match_options[selected_index]
+        selected_match_id = selected_match['id']
 
-            # 선택된 경기에 대한 출석 데이터 확인 및 생성
-            self._render_personal_match_attendance(player_id, player_name, selected_match_id)
+        # 선택된 경기에 대한 출석 데이터 확인 및 생성
+        self._render_personal_match_attendance(player_id, player_name, selected_match_id)
 
     def _render_personal_match_attendance(self, player_id: int, player_name: str, match_id: int) -> None:
         """개인의 특정 경기 출석 관리"""
