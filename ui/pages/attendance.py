@@ -321,12 +321,43 @@ class AttendancePage:
         # 상태 변경 섹션 (무조건 표시)
         st.markdown("### ✏️ 출석 상태 변경")
 
+        # 출석 잠금 상태 확인
+        is_locked = self.attendance_service.is_attendance_locked(match_id)
+
+        # 잠금 상태 정보 표시
+        if match_info:
+            from datetime import datetime, timedelta, timezone
+            lock_minutes = match_info.get('attendance_lock_minutes', 0)
+
+            if lock_minutes > 0:
+                # 한국 표준시(KST) = UTC+9
+                KST = timezone(timedelta(hours=9))
+                now = datetime.now(timezone.utc).astimezone(KST).replace(tzinfo=None)
+                match_datetime = datetime.strptime(f"{match_info['match_date']} {match_info['match_time']}", "%Y-%m-%d %H:%M")
+                lock_datetime = match_datetime - timedelta(minutes=lock_minutes)
+
+                st.info(f"**출석 마감 시간**: {lock_datetime.strftime('%m월 %d일 %H:%M')}")
+
+                if is_locked:
+                    st.error("🔒 **출석 변경 마감됨**")
+                else:
+                    remaining = lock_datetime - now
+                    hours, remainder = divmod(int(remaining.total_seconds()), 3600)
+                    minutes, _ = divmod(remainder, 60)
+                    st.success(f"✅ **변경 가능** (남은 시간: {hours}시간 {minutes}분)")
+
+        st.markdown("---")
+
         if final_player_attendance:
             current_status = final_player_attendance['status']
             st.info(f"**현재 상태**: {final_player_attendance['status_display']}")
         else:
             current_status = 'absent'  # 기본값 변경
             st.warning("출석 데이터가 없어서 기본값(불참)으로 처리합니다.")
+
+        # 잠금 상태 경고 표시
+        if is_locked:
+            st.warning("🔒 **출석 변경 마감**: 경기 시작 시간이 임박하여 출석 상태를 변경할 수 없습니다.")
 
         # 상태 변경 버튼들 (항상 표시)
         col1, col2, col3 = st.columns(3)
@@ -336,8 +367,8 @@ class AttendancePage:
                 "✅ 참석",
                 key=f"btn_present_{match_id}_{player_id}",
                 width="stretch",
-                disabled=(current_status == 'present'),
-                type="primary" if current_status != 'present' else "secondary"
+                disabled=(current_status == 'present' or is_locked),
+                type="primary" if (current_status != 'present' and not is_locked) else "secondary"
             ):
                 # 출석 데이터가 없으면 먼저 생성
                 if not final_player_attendance:
@@ -348,15 +379,15 @@ class AttendancePage:
                     st.success("✅ 참석으로 변경되었습니다!")
                     st.rerun()
                 else:
-                    st.error("❌ 변경에 실패했습니다.")
+                    st.error("❌ 변경에 실패했습니다. 출석 마감 시간이 지났을 수 있습니다.")
 
         with col2:
             if st.button(
                 "❌ 불참",
                 key=f"btn_absent_{match_id}_{player_id}",
                 width="stretch",
-                disabled=(current_status == 'absent'),
-                type="primary" if current_status != 'absent' else "secondary"
+                disabled=(current_status == 'absent' or is_locked),
+                type="primary" if (current_status != 'absent' and not is_locked) else "secondary"
             ):
                 # 출석 데이터가 없으면 먼저 생성
                 if not final_player_attendance:
@@ -367,15 +398,15 @@ class AttendancePage:
                     st.success("❌ 불참으로 변경되었습니다!")
                     st.rerun()
                 else:
-                    st.error("❌ 변경에 실패했습니다.")
+                    st.error("❌ 변경에 실패했습니다. 출석 마감 시간이 지났을 수 있습니다.")
 
         with col3:
             if st.button(
                 "❓ 미정",
                 key=f"btn_pending_{match_id}_{player_id}",
                 width="stretch",
-                disabled=(current_status == 'pending'),
-                type="primary" if current_status != 'pending' else "secondary"
+                disabled=(current_status == 'pending' or is_locked),
+                type="primary" if (current_status != 'pending' and not is_locked) else "secondary"
             ):
                 # 출석 데이터가 없으면 먼저 생성
                 if not final_player_attendance:
@@ -386,7 +417,7 @@ class AttendancePage:
                     st.success("❓ 미정으로 변경되었습니다!")
                     st.rerun()
                 else:
-                    st.error("❌ 변경에 실패했습니다.")
+                    st.error("❌ 변경에 실패했습니다. 출석 마감 시간이 지났을 수 있습니다.")
 
         # 도움말
         st.markdown("---")
