@@ -4,6 +4,7 @@ from typing import Dict, Any
 from services.match_service import match_service
 from services.player_service import player_service
 from services.finance_service import finance_service
+from services.team_builder_service import team_builder_service
 
 class MetricsComponent:
     """메인 지표 컴포넌트"""
@@ -106,6 +107,42 @@ class MetricsComponent:
                     st.success("📢 새로운 소식이 없습니다.")
             except:
                 st.success("📢 소식을 불러올 수 없습니다.")
+
+        # 다음 경기 팀 구성 표시
+        self._render_next_match_team_summary()
+
+    def _render_next_match_team_summary(self) -> None:
+        """다음 경기 팀 구성 요약"""
+        next_match = self.match_service.get_next_match()
+
+        if not next_match:
+            return
+
+        match_id = next_match['id']
+        distribution = team_builder_service.get_distribution(match_id)
+
+        if not distribution:
+            return
+
+        st.markdown("---")
+        st.subheader("🏆 다음 경기 팀 구성")
+
+        teams = distribution.get('teams', [])
+        team_names = distribution.get('team_names', [])
+
+        if teams:
+            # 팀별 간단한 요약
+            team_summary = []
+            for team, team_name in zip(teams, team_names):
+                team_summary.append(f"{team_name}: {len(team)}명")
+
+            st.info(" | ".join(team_summary))
+
+            # 상세 보기 링크
+            if st.button("📋 출석 관리에서 상세 보기", key="view_team_detail"):
+                st.session_state['current_page'] = "attendance"
+                st.session_state['selected_match_id'] = match_id
+                st.rerun()
 
     def render_performance_indicators(self) -> None:
         """성과 지표 (통계 페이지용)"""

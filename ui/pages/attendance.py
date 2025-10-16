@@ -3,6 +3,7 @@ import streamlit as st
 from services.attendance_service import attendance_service
 from services.match_service import match_service
 from services.player_service import player_service
+from services.team_builder_service import team_builder_service
 
 class AttendancePage:
     """출석 관리 페이지"""
@@ -17,7 +18,7 @@ class AttendancePage:
         st.header("📋 출석 관리")
 
         # 출석 관리 탭들
-        tab1, tab2, tab3 = st.tabs(["👤 개인별 출석", "📅 경기별 출석", "📊 출석 통계"])
+        tab1, tab2, tab3 = st.tabs(["👤 개인별 출석", "📅 경기별 출석", "🏆 팀 구성"])
 
         with tab1:
             self._render_personal_attendance_tab()
@@ -26,7 +27,7 @@ class AttendancePage:
             self._render_match_attendance_tab()
 
         with tab3:
-            self._render_attendance_statistics_tab()
+            self._render_team_composition_tab()
 
     def _render_specific_match_attendance(self, match_id: int) -> None:
         """특정 경기의 출석 현황 표시 (달력에서 클릭한 경우)"""
@@ -479,26 +480,44 @@ class AttendancePage:
             st.success("페이지를 새로고침합니다...")
             st.rerun()
 
-    def _render_attendance_statistics_tab(self) -> None:
-        """출석 통계 탭"""
-        st.markdown("### 📊 출석 통계")
+    def _render_team_composition_tab(self) -> None:
+        """팀 구성 탭"""
+        st.markdown("### 🏆 팀 구성")
 
-        # 향후 구현 예정
-        st.info("통계 기능은 추후 추가 예정입니다.")
+        # 경기 선택
+        upcoming_matches = self._get_upcoming_matches()
 
-        # 간단한 최근 출석률 표시 (예시)
-        try:
-            recent_matches = self.match_service.get_recent_matches(5)
-            if recent_matches:
-                st.markdown("#### 최근 경기 출석률")
-                for match in recent_matches:
-                    try:
-                        summary = self.attendance_service.get_attendance_summary(match['id'])
-                        st.write(f"**{match['match_date']}** - 참석률: {summary['present_rate']:.1f}% ({summary['present_count']}/{summary['total_players']}명)")
-                    except:
-                        st.write(f"**{match['match_date']}** - 출석 데이터 없음")
-        except Exception as e:
-            st.error(f"통계를 불러오는 중 오류가 발생했습니다: {e}")
+        if not upcoming_matches:
+            st.info("예정된 경기가 없습니다.")
+            return
+
+        match_options = [
+            {
+                'label': f"{match['match_date']} {match['match_time']} - {match.get('field_name', '미정')} vs {match.get('opponent', '미정')}",
+                'id': match['id']
+            }
+            for match in upcoming_matches
+        ]
+
+        # selectbox 기본값 설정
+        dropdown_key = 'team_composition_match_select'
+        current_index = st.session_state.get(dropdown_key, 0)
+        if not isinstance(current_index, int) or current_index >= len(match_options):
+            current_index = 0
+            st.session_state[dropdown_key] = 0
+
+        selected_index = st.selectbox(
+            "경기 선택",
+            options=list(range(len(match_options))),
+            format_func=lambda idx: match_options[idx]['label'],
+            key=dropdown_key
+        )
+
+        selected_match = match_options[selected_index]
+        selected_match_id = selected_match['id']
+
+        # 팀 구성 표시
+        self._render_team_distribution_detail(selected_match_id)
 
     def _render_match_attendance_detail(self, match_id: int) -> None:
         """경기별 출석 상세 현황"""
@@ -629,6 +648,51 @@ class AttendancePage:
             return {}
         except:
             return {}
+
+    def _render_team_distribution_detail(self, match_id: int) -> None:
+        """팀 구성 상세 표시 (팀 구성 탭용)"""
+        distribution = team_builder_service.get_distribution(match_id)
+
+        if not distribution:
+            st.warning("이 경기의 팀 구성이 아직 저장되지 않았습니다.")
+            st.info("관리자가 '팀 구성' 페이지에서 팀을 구성하고 저장하면 여기에 표시됩니다.")
+            return
+
+        teams = distribution.get('teams', [])
+        bench = distribution.get('bench', [])
+        team_names = distribution.get('team_names', [])
+
+        if not teams:
+            st.info("구성된 팀이 없습니다.")
+            return
+
+        # 팀 구성 요약
+        st.markdown("#### 📊 팀 구성 요약")
+        total_players = sum(len(team) for team in teams) + len(bench)
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("팀 개수", f"{len(teams)}팀")
+        with col2:
+            st.metric("총 인원", f"{total_players}명")
+        with col3:
+            st.metric("벤치", f"{len(bench)}명")
+
+        st.markdown("---")
+
+        # 팀별 카드
+        for i, (team, team_name) in enumerate(zip(teams, team_names)):
+            with st.expander(f"{team_name} ({len(team)}명)", expanded=True):
+                if team:
+                    for player in team:
+                        st.write(f"👤 {player.get('player_name', '알 수 없음')}")
+                else:
+                    st.info("팀원이 없습니다.")
+
+        # 벤치
+        if bench:
+            with st.expander(f"🪑 벤치 ({len(bench)}명)", expanded=False):
+                for player in bench:
+                    st.write(f"👤 {player.get('player_name', '알 수 없음')}")
 
 # 페이지 인스턴스
 attendance_page = AttendancePage()

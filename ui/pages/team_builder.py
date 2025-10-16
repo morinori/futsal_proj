@@ -1,9 +1,7 @@
 """팀 구성 페이지"""
 import streamlit as st
-import pandas as pd
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from io import StringIO
 
 from services.team_builder_service import team_builder_service, PlayerInfo
 from services.attendance_service import attendance_service
@@ -188,12 +186,16 @@ class TeamBuilderPage:
             st.warning("⚠️ 참석 선수가 없어 팀을 구성할 수 없습니다.")
             return
 
+        # 저장된 팀 구성 자동 로드
+        match_key = f"match_{match_id}"
+        if match_key not in st.session_state['team_builder']:
+            self._auto_load_saved_distribution(match_id)
+
         # 팀 설정 카드
         st.markdown("---")
         self._render_team_config(match_id, present_players)
 
         # 팀 구성 상태가 있으면 표시
-        match_key = f"match_{match_id}"
         if match_key in st.session_state['team_builder']:
             self._render_team_distribution(match_id, present_players)
 
@@ -262,6 +264,16 @@ class TeamBuilderPage:
                     if match_key in st.session_state['team_builder']:
                         del st.session_state['team_builder'][match_key]
                     st.rerun()
+
+            # 저장/불러오기 버튼
+            st.markdown("---")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("💾 팀 구성 저장", key=f"save_distribution_{match_id}", use_container_width=True):
+                    self._save_team_distribution(match_id)
+            with col2:
+                if st.button("📂 저장된 팀 불러오기", key=f"load_distribution_{match_id}", use_container_width=True):
+                    self._load_team_distribution(match_id)
 
         else:
             st.error(f"❌ {layout.message}")
@@ -352,9 +364,6 @@ class TeamBuilderPage:
                             self._move_player(match_id, player.player_id, "bench", f"team_{team_idx}")
                             st.rerun()
 
-        # 결과 요약 및 내보내기
-        st.markdown("---")
-        self._render_export_section(match_id, teams, bench, team_names)
 
     def _move_player(self, match_id: int, player_id: int, from_location: str, to_location: str) -> None:
         """선수 이동"""
@@ -376,81 +385,6 @@ class TeamBuilderPage:
         else:
             st.error(message)
 
-    def _render_export_section(
-        self,
-        match_id: int,
-        teams: List[List[PlayerInfo]],
-        bench: List[PlayerInfo],
-        team_names: List[str]
-    ) -> None:
-        """결과 요약 및 내보내기 영역"""
-        st.subheader("📤 결과 내보내기")
-
-        # 텍스트 포맷 생성
-        text_output = self._generate_text_output(teams, bench, team_names)
-
-        # 클립보드 복사용
-        st.text_area("팀 구성 결과 (복사용)", text_output, height=200, key=f"text_output_{match_id}")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            # CSV 다운로드
-            csv_output = self._generate_csv_output(teams, bench, team_names)
-            st.download_button(
-                label="📥 CSV 다운로드",
-                data=csv_output,
-                file_name=f"team_distribution_{match_id}.csv",
-                mime="text/csv",
-                key=f"download_csv_{match_id}"
-            )
-
-        with col2:
-            # 재분배 버튼 (이미 위에 있으므로 생략 가능)
-            pass
-
-    def _generate_text_output(
-        self,
-        teams: List[List[PlayerInfo]],
-        bench: List[PlayerInfo],
-        team_names: List[str]
-    ) -> str:
-        """텍스트 포맷 생성"""
-        lines = []
-        lines.append("=== 팀 구성 결과 ===\n")
-
-        for team, team_name in zip(teams, team_names):
-            lines.append(f"\n[{team_name}] ({len(team)}명)")
-            for player in team:
-                lines.append(f"  - {player.player_name}")
-
-        if bench:
-            lines.append(f"\n[벤치] ({len(bench)}명)")
-            for player in bench:
-                lines.append(f"  - {player.player_name}")
-
-        return "\n".join(lines)
-
-    def _generate_csv_output(
-        self,
-        teams: List[List[PlayerInfo]],
-        bench: List[PlayerInfo],
-        team_names: List[str]
-    ) -> str:
-        """CSV 포맷 생성"""
-        rows = []
-        rows.append(["팀", "선수명"])
-
-        for team, team_name in zip(teams, team_names):
-            for player in team:
-                rows.append([team_name, player.player_name])
-
-        for player in bench:
-            rows.append(["벤치", player.player_name])
-
-        df = pd.DataFrame(rows[1:], columns=rows[0])
-        return df.to_csv(index=False, encoding='utf-8-sig')
-
     def _get_match_info(self, match_id: int) -> Optional[Dict[str, Any]]:
         """경기 정보 조회"""
         all_matches = self.match_service.get_all_matches()
@@ -458,6 +392,99 @@ class TeamBuilderPage:
             if match['id'] == match_id:
                 return match
         return None
+
+    def _save_team_distribution(self, match_id: int) -> None:
+        """팀 구성 저장"""
+        match_key = f"match_{match_id}"
+        if match_key not in st.session_state['team_builder']:
+            st.error("저장할 팀 구성이 없습니다.")
+            return
+
+        data = st.session_state['team_builder'][match_key]
+        teams = data['teams']
+        bench = data['bench']
+        team_names = data['team_names']
+        config = data['config']
+
+        # 관리자 ID 가져오기
+        admin_id = st.session_state.get('admin', {}).get('id')
+
+        # 저장
+        success = self.team_builder_service.save_distribution(
+            match_id=match_id,
+            teams=teams,
+            bench=bench,
+            team_names=team_names,
+            config=config,
+            created_by=admin_id
+        )
+
+        if success:
+            st.success("✅ 팀 구성이 저장되었습니다!")
+        else:
+            st.error("❌ 팀 구성 저장에 실패했습니다.")
+
+    def _auto_load_saved_distribution(self, match_id: int) -> None:
+        """저장된 팀 구성 자동 로드 (조용하게)"""
+        distribution = self.team_builder_service.get_distribution(match_id)
+
+        if not distribution:
+            return  # 저장된 팀 구성이 없으면 조용히 리턴
+
+        # PlayerInfo 객체로 변환
+        teams = []
+        for team in distribution['teams']:
+            teams.append([
+                PlayerInfo(player_id=p['player_id'], player_name=p['player_name'])
+                for p in team
+            ])
+
+        bench = [
+            PlayerInfo(player_id=p['player_id'], player_name=p['player_name'])
+            for p in distribution['bench']
+        ]
+
+        # 세션 상태에 저장
+        match_key = f"match_{match_id}"
+        st.session_state['team_builder'][match_key] = {
+            'config': distribution['config'],
+            'teams': teams,
+            'bench': bench,
+            'team_names': distribution['team_names']
+        }
+
+    def _load_team_distribution(self, match_id: int) -> None:
+        """저장된 팀 구성 불러오기 (버튼 클릭 시)"""
+        distribution = self.team_builder_service.get_distribution(match_id)
+
+        if not distribution:
+            st.warning("저장된 팀 구성이 없습니다.")
+            return
+
+        # PlayerInfo 객체로 변환
+        teams = []
+        for team in distribution['teams']:
+            teams.append([
+                PlayerInfo(player_id=p['player_id'], player_name=p['player_name'])
+                for p in team
+            ])
+
+        bench = [
+            PlayerInfo(player_id=p['player_id'], player_name=p['player_name'])
+            for p in distribution['bench']
+        ]
+
+        # 세션 상태에 저장
+        match_key = f"match_{match_id}"
+        st.session_state['team_builder'][match_key] = {
+            'config': distribution['config'],
+            'teams': teams,
+            'bench': bench,
+            'team_names': distribution['team_names']
+        }
+
+        st.success("✅ 저장된 팀 구성을 불러왔습니다!")
+        st.rerun()
 
 
 # 페이지 인스턴스 생성

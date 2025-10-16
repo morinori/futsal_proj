@@ -208,6 +208,21 @@ def init_complete_db():
             ON video_logs(level);
         """)
 
+        # 팀 구성 테이블
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS team_distributions(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                match_id INTEGER NOT NULL,
+                team_data TEXT NOT NULL,
+                created_by INTEGER,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(match_id) REFERENCES matches(id),
+                FOREIGN KEY(created_by) REFERENCES admins(id),
+                UNIQUE(match_id)
+            );
+        """)
+
         # 초기 샘플 데이터 삽입
         create_sample_data(cur)
 

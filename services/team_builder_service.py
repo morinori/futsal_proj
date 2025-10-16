@@ -1,7 +1,8 @@
 """팀 구성 관련 비즈니스 로직"""
 from typing import List, Dict, Any, Optional, Literal
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+from database.repositories import team_distribution_repo
 
 
 @dataclass
@@ -389,6 +390,72 @@ class TeamBuilderService:
             return False, f"총 인원이 일치하지 않습니다. (예상: {total_players}, 실제: {len(all_player_ids)})"
 
         return True, "검증 통과"
+
+    def save_distribution(
+        self,
+        match_id: int,
+        teams: List[List[PlayerInfo]],
+        bench: List[PlayerInfo],
+        team_names: List[str],
+        config: Dict[str, Any],
+        created_by: Optional[int] = None
+    ) -> bool:
+        """
+        팀 구성을 데이터베이스에 저장
+
+        Args:
+            match_id: 경기 ID
+            teams: 팀별 선수 리스트
+            bench: 벤치 선수 리스트
+            team_names: 팀 이름 리스트
+            config: 팀 설정 정보
+            created_by: 생성한 관리자 ID
+
+        Returns:
+            성공 여부
+        """
+        # PlayerInfo 객체를 dict로 변환
+        teams_dict = [
+            [asdict(player) for player in team]
+            for team in teams
+        ]
+        bench_dict = [asdict(player) for player in bench]
+
+        team_data = {
+            'teams': teams_dict,
+            'bench': bench_dict,
+            'team_names': team_names,
+            'config': config
+        }
+
+        return team_distribution_repo.save(match_id, team_data, created_by)
+
+    def get_distribution(self, match_id: int) -> Optional[Dict[str, Any]]:
+        """
+        경기별 저장된 팀 구성 조회
+
+        Args:
+            match_id: 경기 ID
+
+        Returns:
+            팀 구성 데이터 (teams, bench, team_names, config 포함)
+        """
+        distribution = team_distribution_repo.get_by_match_id(match_id)
+        if distribution and distribution.get('team_data'):
+            return distribution['team_data']
+        return None
+
+    def delete_distribution(self, match_id: int) -> bool:
+        """
+        팀 구성 삭제
+
+        Args:
+            match_id: 경기 ID
+
+        Returns:
+            성공 여부
+        """
+        return team_distribution_repo.delete(match_id)
 
 
 # 싱글톤 인스턴스

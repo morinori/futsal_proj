@@ -1,8 +1,9 @@
 """데이터 액세스 계층 - Repository 패턴"""
 from typing import List, Optional, Dict, Any
 from datetime import date
+import json
 from database.connection import db_manager
-from database.models import Match, Player, Field, PlayerStats, News, FinanceRecord, Gallery, Attendance, Admin, Video
+from database.models import Match, Player, Field, PlayerStats, News, FinanceRecord, Gallery, Attendance, Admin, Video, TeamDistribution
 
 class MatchRepository:
     """경기 데이터 액세스"""
@@ -824,6 +825,81 @@ class VideoRepository:
         result = db_manager.execute_query(query, fetch_all=False)
         return result['total'] if result else 0
 
+class TeamDistributionRepository:
+    """팀 구성 데이터 액세스"""
+
+    def save(self, match_id: int, team_data: Dict[str, Any], created_by: Optional[int] = None) -> bool:
+        """팀 구성 저장 (이미 있으면 업데이트)"""
+        team_data_json = json.dumps(team_data, ensure_ascii=False)
+
+        # 기존 데이터 확인
+        existing = self.get_by_match_id(match_id)
+
+        if existing:
+            # 업데이트
+            query = """
+                UPDATE team_distributions
+                SET team_data = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE match_id = ?
+            """
+            result = db_manager.execute_query(query, (team_data_json, match_id))
+        else:
+            # 생성
+            query = """
+                INSERT INTO team_distributions (match_id, team_data, created_by)
+                VALUES (?, ?, ?)
+            """
+            result = db_manager.execute_query(query, (match_id, team_data_json, created_by))
+
+        return result is not None and result > 0
+
+    def get_by_match_id(self, match_id: int) -> Optional[Dict[str, Any]]:
+        """경기별 팀 구성 조회"""
+        query = """
+            SELECT id, match_id, team_data, created_by, created_at, updated_at
+            FROM team_distributions
+            WHERE match_id = ?
+        """
+        result = db_manager.execute_query(query, (match_id,), fetch_all=False)
+
+        if result:
+            data = dict(result)
+            # JSON 파싱
+            try:
+                data['team_data'] = json.loads(data['team_data'])
+            except json.JSONDecodeError:
+                data['team_data'] = None
+            return data
+        return None
+
+    def delete(self, match_id: int) -> bool:
+        """팀 구성 삭제"""
+        query = "DELETE FROM team_distributions WHERE match_id = ?"
+        result = db_manager.execute_query(query, (match_id,))
+        return result is not None and result > 0
+
+    def get_all(self) -> List[Dict[str, Any]]:
+        """모든 팀 구성 조회"""
+        query = """
+            SELECT td.*, m.match_date, m.match_time
+            FROM team_distributions td
+            JOIN matches m ON m.id = td.match_id
+            ORDER BY m.match_date DESC, m.match_time DESC
+        """
+        results = db_manager.execute_query(query)
+
+        if results:
+            data_list = []
+            for row in results:
+                data = dict(row)
+                try:
+                    data['team_data'] = json.loads(data['team_data'])
+                except json.JSONDecodeError:
+                    data['team_data'] = None
+                data_list.append(data)
+            return data_list
+        return []
+
 # Repository 인스턴스들
 match_repo = MatchRepository()
 player_repo = PlayerRepository()
@@ -835,3 +911,4 @@ finance_repo = FinanceRepository()
 attendance_repo = AttendanceRepository()
 admin_repo = AdminRepository()
 video_repo = VideoRepository()
+team_distribution_repo = TeamDistributionRepository()

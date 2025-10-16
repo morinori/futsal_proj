@@ -128,3 +128,13 @@ class Video:
     id: Optional[int] = None
     created_at: Optional[str] = None
     processed_at: Optional[str] = None
+
+@dataclass
+class TeamDistribution:
+    """팀 구성 모델"""
+    match_id: int
+    team_data: str  # JSON 형식
+    created_by: Optional[int] = None
+    id: Optional[int] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
