@@ -12,6 +12,7 @@ from . import admin_settings
 from . import video_upload
 from . import video_gallery
 from . import news_management
+from . import team_builder
 
 __all__ = [
     'dashboard_page',
@@ -25,5 +26,6 @@ __all__ = [
     'admin_settings',
     'video_upload',
     'video_gallery',
-    'news_management'
+    'news_management',
+    'team_builder'
 ]

@@ -84,6 +84,11 @@ def render_admin_dropdown():
                 st.session_state['admin_menu_expanded'] = False
                 st.rerun()
 
+            if st.button("⚽ 팀 구성", width="stretch", key="admin_team_builder"):
+                st.session_state['current_page'] = 'team_builder'
+                st.session_state['admin_menu_expanded'] = False
+                st.rerun()
+
             if st.button("📰 소식 관리", width="stretch", key="admin_news_management"):
                 st.session_state['current_page'] = 'news_management'
                 st.session_state['admin_menu_expanded'] = False

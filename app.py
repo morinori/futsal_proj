@@ -23,7 +23,8 @@ from ui.pages import (
     video_upload,
     video_gallery,
     news_management,
-    video_logs
+    video_logs,
+    team_builder
 )
 
 # 인증 컴포넌트 import
@@ -644,6 +645,8 @@ def render_main_content():
             video_logs.render_video_logs_page()
         elif normalized_page == "admin_settings":
             admin_settings.render()
+        elif normalized_page == "team_builder":
+            team_builder.render()
         else:
             st.error(f"알 수 없는 페이지: {current_page}")
             logger.warning(f"Unknown page requested: {current_page}")
