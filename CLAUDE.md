@@ -23,6 +23,8 @@
 - `app.py`: Streamlit 엔트리. UI/페이지 라우팅과 세션 복원을 담당합니다.
 - `ui/`: 페이지(`ui/pages/`)와 컴포넌트(`ui/components/`) 모듈.
 - `services/`: 비즈니스 로직 계층.
+- `services/match_service.py`: 경기 생성/수정 시 `attendance_lock_minutes` 검증과 저장을 담당.
+- `services/attendance_service.py`: `is_attendance_locked`로 출석 변경 가능 여부를 판별하고 UI에 전달.
 - `database/`: 리포지토리, 모델, 마이그레이션.
 - `config/settings.py`: 업로드 정책, DB 경로 등 설정.
 - `utils/`: 인증, 검증, 포매터, 파일 보안 등 공통 함수.
@@ -36,6 +38,7 @@
 2. **운영 가드레일**: `claude_guardrails.md` – docker compose 금지, run.sh 기반 운영, git 워크플로, 보안 규칙.
 3. **Codex 설계 메모**: `.codex/AGENT.md` – 요구사항 분석, 문서 산출물 작성 흐름.
 4. **추가 산출물**: `docs/SPEC.md`, `docs/INTERFACES.md`, `docs/TEST_PLAN.md`, `docs/ROADMAP.md`, `docs/QUESTIONS.md`, `docs/CHANGELOG.md` – 필요 시 최신화.
+5. **기능별 스펙 초안**: `docs/attendance_lock_spec.md`, `docs/attendance_match_autoselect_spec.md` – 출석 마감 정책과 드롭다운 동기화 구현 참고.
 
 위 문서들을 차례대로 확인한 뒤 개발을 시작하면 토큰 사용량을 최소화하면서도 최신 지침을 준수할 수 있습니다.
 
@@ -46,6 +49,7 @@
 - JS 텍스트에 직접 값 삽입하지 말고 반드시 `json.dumps` 등으로 직렬화합니다.
 - SQL은 항상 파라미터 바인딩을 사용합니다 (`LIMIT` 포함).
 - 민감 데이터(업로드, DB, 세션 파일)는 커밋하지 않습니다 (.gitignore 유지).
+- 출석 마감 시간을 우회하거나 관리자 전용 예외 로직을 일반 사용자에게 노출하지 않습니다.
 
 세부 근거는 `docs/vuln.md`와 `claude_guardrails.md`에 기록되어 있으니 수정 시 교차 참조하세요.
 
@@ -61,8 +65,9 @@
 1. `docs/vuln.md`에서 수정 대상 취약점이 여전히 열려 있는지 확인하고 해결 여부를 기록합니다.
 2. `claude_guardrails.md`에서 새로운 규칙이 필요한지 검토합니다.
 3. 변경 사항을 구현한 뒤 `./run.sh restart`로 즉시 확인하고, 필요하면 `./run.sh rebuild`로 재배포합니다.
-4. 테스트 계획(`docs/TEST_PLAN.md`)을 갱신하거나 새로운 테스트를 추가합니다.
-5. 문서 업데이트 후 `docs/CHANGELOG.md`에 주요 변경 사항을 기록합니다.
+4. 출석 마감/드롭다운 동기화 기능이 신규 구현물에 영향을 주는지 수동 확인합니다.
+5. 테스트 계획(`docs/TEST_PLAN.md`)을 갱신하거나 새로운 테스트를 추가합니다.
+6. 문서 업데이트 후 `docs/CHANGELOG.md`에 주요 변경 사항을 기록합니다.
 
 ---
 Claude Code는 위 순서를 기준으로 작업하며, 추가 정보가 필요할 때만 세부 문서를 열람하세요. 항상 `./run.sh`와 보안 가드레일을 먼저 확인하는 것을 잊지 마세요.
