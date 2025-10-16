@@ -199,6 +199,9 @@ class TeamBuilderPage:
         if match_key in st.session_state['team_builder']:
             self._render_team_distribution(match_id, present_players)
 
+            # 팀 구성 표시 후 저장/불러오기 버튼 표시
+            self._render_save_load_buttons(match_id)
+
     def _render_team_config(self, match_id: int, present_players: List[Dict[str, Any]]) -> None:
         """팀 설정 카드"""
         st.subheader("⚙️ 팀 설정")
@@ -264,16 +267,6 @@ class TeamBuilderPage:
                     if match_key in st.session_state['team_builder']:
                         del st.session_state['team_builder'][match_key]
                     st.rerun()
-
-            # 저장/불러오기 버튼
-            st.markdown("---")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("💾 팀 구성 저장", key=f"save_distribution_{match_id}", use_container_width=True):
-                    self._save_team_distribution(match_id)
-            with col2:
-                if st.button("📂 저장된 팀 불러오기", key=f"load_distribution_{match_id}", use_container_width=True):
-                    self._load_team_distribution(match_id)
 
         else:
             st.error(f"❌ {layout.message}")
@@ -364,6 +357,16 @@ class TeamBuilderPage:
                             self._move_player(match_id, player.player_id, "bench", f"team_{team_idx}")
                             st.rerun()
 
+    def _render_save_load_buttons(self, match_id: int) -> None:
+        """저장/불러오기 버튼 표시"""
+        st.markdown("---")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("💾 팀 구성 저장", key=f"save_distribution_{match_id}", use_container_width=True):
+                self._save_team_distribution(match_id)
+        with col2:
+            if st.button("📂 저장된 팀 불러오기", key=f"load_distribution_{match_id}", use_container_width=True):
+                self._load_team_distribution(match_id)
 
     def _move_player(self, match_id: int, player_id: int, from_location: str, to_location: str) -> None:
         """선수 이동"""

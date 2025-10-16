@@ -40,10 +40,10 @@ def validate_match_data(data: Dict[str, Any]) -> ValidationResult:
     if attendance_lock_minutes is not None:
         if not isinstance(attendance_lock_minutes, int):
             errors.append("출석 마감 시간은 정수여야 합니다.")
-        elif attendance_lock_minutes < 0 or attendance_lock_minutes > 180:
-            errors.append("출석 마감 시간은 0~180분 범위여야 합니다.")
-        elif attendance_lock_minutes % 30 != 0:
-            errors.append("출석 마감 시간은 30분 단위여야 합니다.")
+        elif attendance_lock_minutes < -1 or attendance_lock_minutes > 180:
+            errors.append("출석 마감 시간은 -1 또는 0~180분 범위여야 합니다.")
+        elif attendance_lock_minutes != -1 and attendance_lock_minutes % 30 != 0:
+            errors.append("출석 마감 시간은 -1(즉시 마감) 또는 30분 단위여야 합니다.")
 
     return ValidationResult(is_valid=len(errors) == 0, errors=errors)
 

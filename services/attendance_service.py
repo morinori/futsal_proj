@@ -31,8 +31,14 @@ class AttendanceService:
         if not match:
             return False
 
+        lock_minutes = match.get('attendance_lock_minutes', 0)
+
+        # -1이면 즉시 마감 (항상 잠금)
+        if lock_minutes == -1:
+            return True
+
         # 출석 마감 시간이 0이면 제한 없음
-        if match.get('attendance_lock_minutes', 0) == 0:
+        if lock_minutes == 0:
             return False
 
         try:

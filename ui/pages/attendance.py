@@ -381,7 +381,11 @@ class AttendancePage:
             from datetime import datetime, timedelta, timezone
             lock_minutes = match_info.get('attendance_lock_minutes', 0)
 
-            if lock_minutes > 0:
+            if lock_minutes == -1:
+                # 즉시 마감 특별 안내
+                st.warning("⚠️ **관리자 즉시 마감**: 이 경기는 관리자에 의해 출석이 즉시 마감되었습니다.")
+                st.error("🔒 **출석 변경 불가**")
+            elif lock_minutes > 0:
                 # 한국 표준시(KST) = UTC+9
                 KST = timezone(timedelta(hours=9))
                 now = datetime.now(timezone.utc).astimezone(KST).replace(tzinfo=None)
@@ -409,7 +413,10 @@ class AttendancePage:
 
         # 잠금 상태 경고 표시
         if is_locked:
-            st.warning("🔒 **출석 변경 마감**: 경기 시작 시간이 임박하여 출석 상태를 변경할 수 없습니다.")
+            if match_info and match_info.get('attendance_lock_minutes') == -1:
+                st.warning("🔒 **출석 변경 마감**: 관리자가 출석을 즉시 마감했습니다.")
+            else:
+                st.warning("🔒 **출석 변경 마감**: 경기 시작 시간이 임박하여 출석 상태를 변경할 수 없습니다.")
 
         # 상태 변경 버튼들 (항상 표시)
         col1, col2, col3 = st.columns(3)
