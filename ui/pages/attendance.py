@@ -21,12 +21,15 @@ class AttendancePage:
         tab1, tab2, tab3 = st.tabs(["👤 개인별 출석", "📅 경기별 출석", "🏆 팀 구성"])
 
         with tab1:
+            st.session_state["attendance_active_tab"] = "personal"
             self._render_personal_attendance_tab()
 
         with tab2:
+            st.session_state["attendance_active_tab"] = "match"
             self._render_match_attendance_tab()
 
         with tab3:
+            st.session_state["attendance_active_tab"] = "team"
             self._render_team_composition_tab()
 
     def _render_specific_match_attendance(self, match_id: int) -> None:
@@ -209,15 +212,30 @@ class AttendancePage:
             st.warning("등록된 선수가 없습니다.")
             return
 
+        # FR1, FR3: Use dummy placeholder option (Streamlit 1.20 doesn't support index=None)
+        PLACEHOLDER_TEXT = "-- 선수를 선택하세요 --"
+        player_names = [player['name'] for player in players]
+        dropdown_options = [PLACEHOLDER_TEXT] + player_names
+
+        # Build player_id mapping (excluding placeholder)
         player_options = {player['name']: player['id'] for player in players}
+
+        # Get current selection or default to placeholder (index 0)
+        current_selection = st.session_state.get("personal_attendance_player", PLACEHOLDER_TEXT)
+        try:
+            default_index = dropdown_options.index(current_selection)
+        except ValueError:
+            default_index = 0  # Default to placeholder
 
         selected_player_name = st.selectbox(
             "👤 누구세요?",
-            options=list(player_options.keys()),
+            options=dropdown_options,
+            index=default_index,
             key="personal_attendance_player"
         )
 
-        if selected_player_name:
+        # FR2: Gate all downstream calls behind valid player selection
+        if selected_player_name and selected_player_name != PLACEHOLDER_TEXT:
             player_id = player_options[selected_player_name]
 
             # 선수가 변경될 때마다 해당 선수의 생성 플래그를 초기화 (한 번만)
@@ -237,10 +255,22 @@ class AttendancePage:
                 st.session_state[current_player_key] = True
 
             self._render_personal_attendance_detail(player_id, selected_player_name)
+        else:
+            # FR3: Display prompt when placeholder is active
+            st.info("👆 위 드롭다운에서 선수를 먼저 선택해주세요.")
+            st.markdown("---")
+            st.markdown("### 안내")
+            st.markdown("""
+            - 출석 상태를 변경하려면 먼저 **선수를 선택**해야 합니다.
+            - 선수를 선택하면 참석할 경기를 고르고 출석 상태를 변경할 수 있습니다.
+            """)
 
     def _render_personal_attendance_detail(self, player_id: int, player_name: str) -> None:
         """개인 출석 상세 관리"""
         st.markdown(f"### {player_name}님의 출석 관리")
+
+        # Status pill showing selected player
+        st.info(f"**선택된 선수**: {player_name}")
 
         # 예정된 경기 목록 조회
         upcoming_match_list = self._get_upcoming_matches()
@@ -429,6 +459,10 @@ class AttendancePage:
                 disabled=(current_status == 'present' or is_locked),
                 type="primary" if (current_status != 'present' and not is_locked) else "secondary"
             ):
+                # FR6: Confirmation before updating
+                match_label = f"{match_info['match_date']} {match_info['match_time']}" if match_info else f"경기 #{match_id}"
+                st.info(f"**확인**: {player_name} → {match_label} (참석)")
+
                 # 출석 데이터가 없으면 먼저 생성
                 if not final_player_attendance:
                     self.attendance_service.create_attendance_for_match(match_id)
@@ -448,6 +482,10 @@ class AttendancePage:
                 disabled=(current_status == 'absent' or is_locked),
                 type="primary" if (current_status != 'absent' and not is_locked) else "secondary"
             ):
+                # FR6: Confirmation before updating
+                match_label = f"{match_info['match_date']} {match_info['match_time']}" if match_info else f"경기 #{match_id}"
+                st.info(f"**확인**: {player_name} → {match_label} (불참)")
+
                 # 출석 데이터가 없으면 먼저 생성
                 if not final_player_attendance:
                     self.attendance_service.create_attendance_for_match(match_id)
@@ -467,6 +505,10 @@ class AttendancePage:
                 disabled=(current_status == 'pending' or is_locked),
                 type="primary" if (current_status != 'pending' and not is_locked) else "secondary"
             ):
+                # FR6: Confirmation before updating
+                match_label = f"{match_info['match_date']} {match_info['match_time']}" if match_info else f"경기 #{match_id}"
+                st.info(f"**확인**: {player_name} → {match_label} (미정)")
+
                 # 출석 데이터가 없으면 먼저 생성
                 if not final_player_attendance:
                     self.attendance_service.create_attendance_for_match(match_id)

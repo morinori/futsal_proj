@@ -69,5 +69,122 @@
 5. 테스트 계획(`docs/TEST_PLAN.md`)을 갱신하거나 새로운 테스트를 추가합니다.
 6. 문서 업데이트 후 `docs/CHANGELOG.md`에 주요 변경 사항을 기록합니다.
 
+## 8. Streamlit 개발 시 주의사항 및 고려사항
+
+### 8.1 Streamlit Tabs 렌더링 동작 이해
+
+**문제**: Streamlit의 `st.tabs()`는 모든 탭을 동시에 렌더링하므로, 각 탭에서 세션 상태를 변경하면 예상치 못한 덮어쓰기가 발생할 수 있습니다.
+
+**증상 사례** (`attendance.py` 2025-10-17 이슈):
+- 개인별 출석 탭에서 선수를 선택해도 페이지가 렌더링되지 않음
+- 탭 함수 내부에서 `st.session_state["attendance_active_tab"]`을 설정했으나, 세 탭이 모두 렌더링되면서 마지막 탭("team")이 값을 덮어씀
+- 결과적으로 탭 전환 감지 로직이 항상 "다른 탭에서 왔다"고 판단하여 선수 선택을 초기화
+
+**해결 방법**:
+```python
+# ❌ 잘못된 방법: 각 탭 함수 내부에서 설정
+def _render_personal_attendance_tab(self):
+    st.session_state["attendance_active_tab"] = "personal"  # 다른 탭이 덮어씀
+    # ...
+
+# ✅ 올바른 방법: 각 `with tab` 블록에서 직접 설정
+def render(self):
+    tab1, tab2, tab3 = st.tabs(["👤 개인별", "📅 경기별", "🏆 팀"])
+
+    with tab1:
+        st.session_state["attendance_active_tab"] = "personal"
+        self._render_personal_attendance_tab()
+
+    with tab2:
+        st.session_state["attendance_active_tab"] = "match"
+        self._render_match_attendance_tab()
+```
+
+**교훈**:
+- Streamlit tabs는 모든 `with tab` 블록을 순차적으로 실행하므로, 각 블록 내에서 상태를 설정해야 현재 활성 탭을 정확히 추적할 수 있습니다.
+- 탭 함수 내부에서 세션 상태를 변경하면 모든 탭이 동일한 상태를 공유하게 되어 의도와 다른 동작이 발생합니다.
+
+### 8.2 Selectbox 상태 관리 및 리렌더링
+
+**문제**: Streamlit selectbox는 `key`로 세션 상태와 연동되지만, 초기 렌더링 시 상태가 없으면 첫 번째 옵션을 자동 선택합니다.
+
+**증상 사례**:
+- 플레이스홀더 옵션("-- 선수를 선택하세요 --")을 첫 번째로 추가했지만, JavaScript로 선택한 값이 Streamlit 세션 상태에 반영되지 않음
+- 페이지 리렌더링 시 여전히 플레이스홀더가 선택되어 조건문(`if selected != PLACEHOLDER`)을 통과하지 못함
+
+**해결 방법**:
+```python
+# ✅ index 파라미터로 현재 선택 유지
+PLACEHOLDER_TEXT = "-- 선수를 선택하세요 --"
+dropdown_options = [PLACEHOLDER_TEXT] + player_names
+
+# 현재 세션 상태에서 선택된 값 가져오기
+current_selection = st.session_state.get("personal_attendance_player", PLACEHOLDER_TEXT)
+try:
+    default_index = dropdown_options.index(current_selection)
+except ValueError:
+    default_index = 0  # 기본값: 플레이스홀더
+
+selected_player_name = st.selectbox(
+    "👤 누구세요?",
+    options=dropdown_options,
+    index=default_index,  # 명시적으로 현재 선택 유지
+    key="personal_attendance_player"
+)
+```
+
+**교훈**:
+- Streamlit의 `key` 파라미터는 세션 상태와 위젯을 연결하지만, **초기 렌더링 시 `index`를 명시하지 않으면 첫 번째 옵션이 강제 선택**됩니다.
+- JavaScript로 DOM을 직접 조작해도 Streamlit 세션 상태는 업데이트되지 않으므로, 반드시 `index`로 상태를 명시적으로 관리해야 합니다.
+
+### 8.3 브라우저 테스트의 중요성
+
+**문제**: 코드 상으로는 정상 작동하는 것처럼 보이지만, 실제 브라우저에서는 렌더링 순서나 상태 관리 이슈로 동작하지 않을 수 있습니다.
+
+**증상 사례**:
+- 로그에 에러가 없고 코드 로직도 올바르지만, 브라우저에서 선수 선택 후 페이지가 표시되지 않음
+- Playwright를 통한 실제 브라우저 테스트로만 문제를 재현하고 확인 가능
+
+**권장 사항**:
+1. **UI 변경 시 반드시 브라우저 테스트 수행**:
+   ```bash
+   # Playwright MCP 또는 수동 브라우저 확인
+   ./run.sh restart
+   # http://localhost:8501 접속하여 실제 동작 확인
+   ```
+
+2. **디버깅 정보 활용**:
+   - 개발 중에는 주석 처리된 디버깅 정보를 활성화하여 세션 상태 확인
+   - `st.write(st.session_state)`로 전체 상태 덤프
+
+3. **점진적 검증**:
+   - 기능 단위로 작게 나누어 구현 후 즉시 브라우저 확인
+   - 복잡한 상태 관리 로직은 단순화한 뒤 점진적으로 추가
+
+### 8.4 세션 상태 초기화 패턴
+
+**문제**: 탭 전환 시 상태를 초기화하려는 로직이 오히려 정상 동작을 방해할 수 있습니다.
+
+**증상 사례**:
+- "다른 탭에서 왔을 때만 초기화"하려는 복잡한 로직이 tabs의 동시 렌더링 특성과 충돌
+- 조건문이 항상 참이 되어 사용자가 선택한 값이 즉시 초기화됨
+
+**권장 패턴**:
+```python
+# ❌ 복잡한 탭 전환 감지 로직 지양
+previous_tab = st.session_state.get("active_tab")
+if previous_tab is not None and previous_tab != "current":
+    # 상태 초기화 - 예상치 못한 동작 발생 가능
+
+# ✅ 명시적인 초기화 버튼 제공
+if st.button("🔄 선택 초기화"):
+    del st.session_state["player_selection"]
+    st.rerun()
+```
+
+**교훈**:
+- **단순함이 최선**: 복잡한 자동 초기화 로직보다 명시적인 사용자 액션(버튼)이 더 안전하고 예측 가능합니다.
+- 상태 초기화가 필요하다면 사용자가 명확히 인지할 수 있는 UI 요소를 제공하세요.
+
 ---
 Claude Code는 위 순서를 기준으로 작업하며, 추가 정보가 필요할 때만 세부 문서를 열람하세요. 항상 `./run.sh`와 보안 가드레일을 먼저 확인하는 것을 잊지 마세요.
