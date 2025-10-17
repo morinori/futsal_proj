@@ -14,7 +14,7 @@
   - `services/match_service.py`: `attendance_lock_minutes` 검증 범위 및 저장 확인.
   - `services/news_service.py`: 소식 생성/수정 시 검증 오류 처리와 Repository 호출 여부.
 - **통합 테스트 (수동/스크립트)**
-  1. `./run.sh restart` 후 관리자 로그인 → 출석/경기/재정 페이지 접근.
+ 1. `./run.sh restart` 후 `docker logs --tail 50 futsal-team-platform`으로 초기 관리자 비밀번호를 확인해 안전한 곳에 기록한 뒤 로그인 → 출석/경기/재정 페이지 접근.
   2. 테스트용 동영상 업로드 → HLS 변환 완료 여부 확인 (`uploads/videos/hls/{id}`).
   3. 갤러리 필터(특정 경기/정보 없음) 동작 확인.
   4. 경기 추가/수정 시 출석 마감 옵션을 각각 선택하고, 설정된 시간 이후 일반 계정에서 출석 버튼이 잠기는지 확인.
@@ -27,7 +27,7 @@
 
 ## 데이터 및 픽스처
 - 단위 테스트는 인메모리 SQLite (`sqlite3.connect(':memory:')`) 또는 임시 파일 사용.
-- 샘플 관리자 계정/선수/경기 데이터는 `database/migrations.py`의 초기화 함수를 활용.
+- 샘플 관리자 계정/선수/경기 데이터는 `database/migrations.py`의 초기화 함수를 활용. 생성된 관리자 비밀번호는 매번 랜덤이며 DB에는 bcrypt 해시만 저장되므로 컨테이너 부팅 직후 `docker logs futsal-team-platform`으로 출력된 값을 확보한다.
 - 동영상 테스트 시 작은 샘플 파일(수 초 길이)을 사용하고, 테스트 후 `uploads/` 정리.
 
 ## 종료 기준

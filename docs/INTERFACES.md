@@ -17,6 +17,7 @@
   - `generate_thumbnail(video_path, video_id)` : 썸네일 이미지 생성.
 - `AuthService`
   - `login(username, password)` : bcrypt 검증 후 관리자 정보 반환.
+  - `get_all_admins()` : 활성 관리자 목록 조회 시 비밀번호 해시를 제거해 반환.
   - `create_admin(...)`, `change_password(...)`, `deactivate_admin(...)` : 관리자 계정 관리.
 - `NewsService`
   - `create_news(...)` / `update_news(...)` : 소식 등록·수정 시 입력 검증 및 Repository 호출.
@@ -29,7 +30,7 @@
   - `VideoRepository.get_completed_videos(limit=None)` : 완료된 영상 목록 (limit는 파라미터 바인딩 권장).
   - `VideoRepository.update_processing_status(...)` : 상태/경로/재생시간 업데이트.
   - `NewsRepository.update(news_id, title, content, author, pinned, category)` : 소식 수정.
-  - `AdminRepository.get_by_username`, `update_last_login`, `update_password`, `deactivate`.
+  - `AdminRepository.create`, `get_by_username`, `get_by_id`, `get_all_active`, `update_last_login`, `update_password`, `deactivate`.
 - 규칙: UI/Service는 SQL을 직접 실행하지 않고 Repository를 통해 데이터에 접근해야 한다.
 
 ## UI 페이지 & 컴포넌트

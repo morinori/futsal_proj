@@ -22,6 +22,7 @@
    - 관리자 뉴스 관리 페이지에서 소식 등록뿐 아니라 수정/고정 토글을 지원.
 5. **관리자 인증**
    - bcrypt 기반 비밀번호 검증, 세션 상태 점검, 드롭다운 메뉴를 통한 페이지 이동.
+   - 초기 관리자 계정(`admin`, `captain`, `manager`)은 `database/migrations.py` 실행 시 `secrets.token_urlsafe`로 랜덤 비밀번호가 생성되고 콘솔 로그에 한 번만 출력된다. 배포 후 즉시 `docker logs futsal-team-platform`으로 값을 확인해 안전하게 전달·변경한다.
 
 ## 사용자 플로우 요약
 1. **관리자 로그인**
