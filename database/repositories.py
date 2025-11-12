@@ -581,23 +581,30 @@ class AttendanceRepository:
         return [dict(row) for row in results] if results else []
 
     def get_summary_by_match(self, match_id: int) -> Dict[str, int]:
-        """경기별 출석 요약 (참석/불참/미정 인원수)"""
+        """경기별 출석 요약 (참석/불참/미정/미응답 인원수)"""
         query = """
             SELECT
-                status,
-                COUNT(*) as count
+                SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) AS present,
+                SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) AS absent,
+                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
+                SUM(CASE WHEN status = 'absent' AND updated_at = created_at THEN 1 ELSE 0 END) AS unresponded,
+                COUNT(*) AS total
             FROM attendance
             WHERE match_id = ?
-            GROUP BY status
         """
-        results = db_manager.execute_query(query, (match_id,))
-        summary = {'present': 0, 'absent': 0, 'pending': 0}
 
-        if results:
-            for row in results:
-                summary[row['status']] = row['count']
+        result = db_manager.execute_query(query, (match_id,), fetch_all=False)
 
-        return summary
+        if not result:
+            return {'present': 0, 'absent': 0, 'pending': 0, 'unresponded': 0, 'total': 0}
+
+        return {
+            'present': result['present'] or 0,
+            'absent': result['absent'] or 0,
+            'pending': result['pending'] or 0,
+            'unresponded': result['unresponded'] or 0,
+            'total': result['total'] or 0
+        }
 
     def get_for_match(self, match_id: int) -> List[Dict[str, Any]]:
         """특정 경기의 출석 정보 (기존 메소드 유지)"""

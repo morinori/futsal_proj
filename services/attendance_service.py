@@ -83,7 +83,9 @@ class AttendanceService:
                 'player_name': att['player_name'],
                 'status': att['status'],
                 'status_display': self._get_status_display(att['status']),
-                'updated_at': att.get('updated_at', '')
+                'updated_at': att.get('updated_at', ''),
+                'created_at': att.get('created_at', ''),
+                'has_responded': self._has_player_responded(att)
             }
             for att in attendances
         ]
@@ -107,13 +109,16 @@ class AttendanceService:
     def get_attendance_summary(self, match_id: int) -> Dict[str, Any]:
         """경기 출석 요약 통계"""
         summary = self.attendance_repo.get_summary_by_match(match_id)
-        total = sum(summary.values())
+        total = summary.get('total', 0) or (
+            summary.get('present', 0) + summary.get('absent', 0) + summary.get('pending', 0)
+        )
 
         return {
             'total_players': total,
             'present_count': summary['present'],
             'absent_count': summary['absent'],
             'pending_count': summary['pending'],
+            'unresponded_count': summary.get('unresponded', 0),
             'present_rate': (summary['present'] / total * 100) if total > 0 else 0
         }
 
@@ -133,6 +138,19 @@ class AttendanceService:
             ('absent', '❌ 불참'),
             ('pending', '❓ 미정')
         ]
+
+    def _has_player_responded(self, att: Dict[str, Any]) -> bool:
+        """선수가 기본값(자동 불참) 이후에 직접 응답했는지 여부"""
+        status = att.get('status')
+        if status != 'absent':
+            return True
+
+        updated_at = att.get('updated_at')
+        created_at = att.get('created_at')
+        if not updated_at or not created_at:
+            return False
+
+        return updated_at != created_at
 
 # 서비스 인스턴스
 attendance_service = AttendanceService()

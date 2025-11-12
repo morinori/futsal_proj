@@ -106,17 +106,19 @@ class AttendancePage:
         # 출석 요약
         summary = self.attendance_service.get_attendance_summary(match_id)
 
-        # 2x2 그리드로 변경 (모바일 대응)
-        col1, col2 = st.columns(2)
+        # 요약 메트릭: 총원/참석/미응답/불참/미정
+        col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("총 인원", summary['total_players'])
         with col2:
             st.metric("✅ 참석", summary['present_count'])
-
-        col3, col4 = st.columns(2)
         with col3:
-            st.metric("❌ 불참", summary['absent_count'])
+            st.metric("⏳ 응답 없음", summary['unresponded_count'])
+
+        col4, col5 = st.columns(2)
         with col4:
+            st.metric("❌ 불참", summary['absent_count'])
+        with col5:
             st.metric("❓ 미정", summary['pending_count'])
 
         # 전체 출석 현황 테이블
@@ -436,9 +438,11 @@ class AttendancePage:
 
         if final_player_attendance:
             current_status = final_player_attendance['status']
+            has_responded = final_player_attendance.get('has_responded', False)
             st.info(f"**현재 상태**: {final_player_attendance['status_display']}")
         else:
             current_status = 'absent'  # 기본값 변경
+            has_responded = False
             st.warning("출석 데이터가 없어서 기본값(불참)으로 처리합니다.")
 
         # 잠금 상태 경고 표시
@@ -479,7 +483,7 @@ class AttendancePage:
                 "❌ 불참",
                 key=f"btn_absent_{match_id}_{player_id}",
                 width="stretch",
-                disabled=(current_status == 'absent' or is_locked),
+                disabled=((current_status == 'absent' and has_responded) or is_locked),
                 type="primary" if (current_status != 'absent' and not is_locked) else "secondary"
             ):
                 # FR6: Confirmation before updating
@@ -613,17 +617,19 @@ class AttendancePage:
         # 출석 요약
         summary = self.attendance_service.get_attendance_summary(match_id)
 
-        # 2x2 그리드로 변경 (모바일 대응)
-        col1, col2 = st.columns(2)
+        # 요약 메트릭
+        col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("총 인원", summary['total_players'])
         with col2:
             st.metric("✅ 참석", summary['present_count'])
-
-        col3, col4 = st.columns(2)
         with col3:
-            st.metric("❌ 불참", summary['absent_count'])
+            st.metric("⏳ 응답 없음", summary['unresponded_count'])
+
+        col4, col5 = st.columns(2)
         with col4:
+            st.metric("❌ 불참", summary['absent_count'])
+        with col5:
             st.metric("❓ 미정", summary['pending_count'])
 
         # 참석률 진행바
@@ -636,10 +642,12 @@ class AttendancePage:
         attendance_list = self.attendance_service.get_match_attendance(match_id)
 
         if attendance_list:
-            # 상태별로 그룹화 (불참 제외)
+            # 상태별로 그룹화 (불참은 응답 여부로 다시 분리)
             present_players = [att for att in attendance_list if att['status'] == 'present']
             absent_players = [att for att in attendance_list if att['status'] == 'absent']
             pending_players = [att for att in attendance_list if att['status'] == 'pending']
+            unresponded_players = [att for att in absent_players if not att.get('has_responded')]
+            confirmed_absent_players = [att for att in absent_players if att.get('has_responded')]
 
             # 참석과 미정만 2컬럼으로 표시
             col1, col2 = st.columns(2)
@@ -661,16 +669,25 @@ class AttendancePage:
                     st.write("미정 상태인 선수가 없습니다.")
 
             # 불참 선수 보기 옵션 (선택적 표시)
-            if absent_players:
+            if unresponded_players:
+                st.markdown("---")
+                st.markdown("**⏳ 아직 투표하지 않은 선수**")
+                for player in unresponded_players:
+                    st.write(f"• {player['player_name']}")
+
+            if confirmed_absent_players:
                 st.markdown("---")
                 if st.checkbox("👁️ 불참 선수도 보기", key=f"show_absent_{match_id}"):
-                    st.markdown("**❌ 불참 선수**")
-                    for player in absent_players:
+                    st.markdown("**❌ 불참 확정 선수**")
+                    for player in confirmed_absent_players:
                         st.write(f"• {player['player_name']}")
 
             # 추가 안내
             st.markdown("---")
-            st.info(f"📝 **참고**: 총 {len(absent_players)}명이 불참으로 설정되어 있습니다. (기본값)")
+            st.info(
+                f"📝 **참고**: 불참 확정 {len(confirmed_absent_players)}명 · "
+                f"미정 {summary['pending_count']}명 · 무응답 {len(unresponded_players)}명"
+            )
 
         else:
             st.info("출석 데이터가 없습니다.")
