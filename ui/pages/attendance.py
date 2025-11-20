@@ -106,6 +106,16 @@ class AttendancePage:
         # 출석 요약
         summary = self.attendance_service.get_attendance_summary(match_id)
 
+        # 정원 정보 표시
+        if summary.get('capacity') is not None and summary['capacity'] > 0:
+            capacity_info = f"🎯 참석 정원: **{summary['present_count']}/{summary['capacity']}명**"
+            if summary.get('remaining_slots') is not None:
+                if summary['remaining_slots'] > 0:
+                    capacity_info += f" (잔여 {summary['remaining_slots']}석)"
+                else:
+                    capacity_info += " ⚠️ **정원 마감**"
+            st.info(capacity_info)
+
         # 요약 메트릭: 총원/참석/미응답/불참/미정
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -452,16 +462,30 @@ class AttendancePage:
             else:
                 st.warning("🔒 **출석 변경 마감**: 경기 시작 시간이 임박하여 출석 상태를 변경할 수 없습니다.")
 
+        # 정원 체크
+        summary = self.attendance_service.get_attendance_summary(match_id)
+        is_capacity_full = summary.get('is_full', False)
+        is_currently_present = (current_status == 'present')
+
+        # 정원 마감 경고 표시
+        if is_capacity_full and not is_currently_present:
+            capacity = summary.get('capacity', 0)
+            present_count = summary.get('present_count', 0)
+            st.error(f"⚠️ **정원 마감**: 참석 정원이 가득 찼습니다. (현재 {present_count}/{capacity}명)")
+
         # 상태 변경 버튼들 (항상 표시)
         col1, col2, col3 = st.columns(3)
 
         with col1:
+            # 참석 버튼: 이미 참석 중이거나, 잠금 상태이거나, 정원이 찬 경우 비활성화
+            is_present_disabled = is_currently_present or is_locked or (is_capacity_full and not is_currently_present)
+
             if st.button(
                 "✅ 참석",
                 key=f"btn_present_{match_id}_{player_id}",
                 width="stretch",
-                disabled=(current_status == 'present' or is_locked),
-                type="primary" if (current_status != 'present' and not is_locked) else "secondary"
+                disabled=is_present_disabled,
+                type="primary" if not is_present_disabled else "secondary"
             ):
                 # FR6: Confirmation before updating
                 match_label = f"{match_info['match_date']} {match_info['match_time']}" if match_info else f"경기 #{match_id}"
@@ -471,12 +495,12 @@ class AttendancePage:
                 if not final_player_attendance:
                     self.attendance_service.create_attendance_for_match(match_id)
 
-                success = self.attendance_service.update_player_status(match_id, player_id, 'present')
-                if success:
-                    st.success("✅ 참석으로 변경되었습니다!")
+                result = self.attendance_service.update_player_status(match_id, player_id, 'present')
+                if result['success']:
+                    st.success(f"✅ {result['message']}")
                     st.rerun()
                 else:
-                    st.error("❌ 변경에 실패했습니다. 출석 마감 시간이 지났을 수 있습니다.")
+                    st.error(f"❌ {result['message']}")
 
         with col2:
             if st.button(
@@ -494,12 +518,12 @@ class AttendancePage:
                 if not final_player_attendance:
                     self.attendance_service.create_attendance_for_match(match_id)
 
-                success = self.attendance_service.update_player_status(match_id, player_id, 'absent')
-                if success:
-                    st.success("❌ 불참으로 변경되었습니다!")
+                result = self.attendance_service.update_player_status(match_id, player_id, 'absent')
+                if result['success']:
+                    st.success(f"✅ {result['message']}")
                     st.rerun()
                 else:
-                    st.error("❌ 변경에 실패했습니다. 출석 마감 시간이 지났을 수 있습니다.")
+                    st.error(f"❌ {result['message']}")
 
         with col3:
             if st.button(
@@ -517,12 +541,12 @@ class AttendancePage:
                 if not final_player_attendance:
                     self.attendance_service.create_attendance_for_match(match_id)
 
-                success = self.attendance_service.update_player_status(match_id, player_id, 'pending')
-                if success:
-                    st.success("❓ 미정으로 변경되었습니다!")
+                result = self.attendance_service.update_player_status(match_id, player_id, 'pending')
+                if result['success']:
+                    st.success(f"✅ {result['message']}")
                     st.rerun()
                 else:
-                    st.error("❌ 변경에 실패했습니다. 출석 마감 시간이 지났을 수 있습니다.")
+                    st.error(f"❌ {result['message']}")
 
         # 도움말
         st.markdown("---")
@@ -616,6 +640,16 @@ class AttendancePage:
 
         # 출석 요약
         summary = self.attendance_service.get_attendance_summary(match_id)
+
+        # 정원 정보 표시
+        if summary.get('capacity') is not None and summary['capacity'] > 0:
+            capacity_info = f"🎯 참석 정원: **{summary['present_count']}/{summary['capacity']}명**"
+            if summary.get('remaining_slots') is not None:
+                if summary['remaining_slots'] > 0:
+                    capacity_info += f" (잔여 {summary['remaining_slots']}석)"
+                else:
+                    capacity_info += " ⚠️ **정원 마감**"
+            st.info(capacity_info)
 
         # 요약 메트릭
         col1, col2, col3 = st.columns(3)

@@ -13,7 +13,8 @@ class MatchService:
         self.match_repo = match_repo
         self.field_repo = field_repo
 
-    def create_match(self, field_id: int, match_date: date, match_time: str, opponent: str = "", attendance_lock_minutes: int = 0) -> bool:
+    def create_match(self, field_id: int, match_date: date, match_time: str, opponent: str = "",
+                     attendance_lock_minutes: int = 0, attendance_capacity: Optional[int] = None) -> bool:
         """경기 생성 (출석 상태 자동 생성 포함)"""
         # 데이터 검증
         validation_result = validate_match_data({
@@ -21,11 +22,20 @@ class MatchService:
             'match_date': match_date,
             'match_time': match_time,
             'opponent': opponent,
-            'attendance_lock_minutes': attendance_lock_minutes
+            'attendance_lock_minutes': attendance_lock_minutes,
+            'attendance_capacity': attendance_capacity
         })
 
         if not validation_result.is_valid:
             raise ValueError(f"Invalid match data: {', '.join(validation_result.errors)}")
+
+        # 정원 검증
+        if attendance_capacity is None:
+            raise ValueError("정원은 필수 입력 항목입니다.")
+        if attendance_capacity < 1:
+            raise ValueError("정원은 1명 이상이어야 합니다.")
+        if attendance_capacity > 50:
+            raise ValueError("정원은 최대 50명까지 설정할 수 있습니다.")
 
         # 경기 생성
         match = Match(
@@ -33,7 +43,8 @@ class MatchService:
             match_date=match_date,
             match_time=match_time,
             opponent=opponent,
-            attendance_lock_minutes=attendance_lock_minutes
+            attendance_lock_minutes=attendance_lock_minutes,
+            attendance_capacity=attendance_capacity
         )
 
         # 경기 생성
@@ -119,7 +130,8 @@ class MatchService:
 
         return False
 
-    def update_match(self, match_id: int, field_id: int, match_date: date, match_time: str, opponent: str = "", result: str = "", attendance_lock_minutes: int = 0) -> bool:
+    def update_match(self, match_id: int, field_id: int, match_date: date, match_time: str, opponent: str = "",
+                     result: str = "", attendance_lock_minutes: int = 0, attendance_capacity: Optional[int] = None) -> bool:
         """경기 정보 업데이트"""
         # 데이터 검증
         validation_result = validate_match_data({
@@ -128,11 +140,20 @@ class MatchService:
             'match_time': match_time,
             'opponent': opponent,
             'result': result,
-            'attendance_lock_minutes': attendance_lock_minutes
+            'attendance_lock_minutes': attendance_lock_minutes,
+            'attendance_capacity': attendance_capacity
         })
 
         if not validation_result.is_valid:
             raise ValueError(f"Invalid match data: {', '.join(validation_result.errors)}")
+
+        # 정원 검증
+        if attendance_capacity is None:
+            raise ValueError("정원은 필수 입력 항목입니다.")
+        if attendance_capacity < 1:
+            raise ValueError("정원은 1명 이상이어야 합니다.")
+        if attendance_capacity > 50:
+            raise ValueError("정원은 최대 50명까지 설정할 수 있습니다.")
 
         # 경기 정보 업데이트
         updated_match = Match(
@@ -142,7 +163,8 @@ class MatchService:
             match_time=match_time,
             opponent=opponent,
             result=result,
-            attendance_lock_minutes=attendance_lock_minutes
+            attendance_lock_minutes=attendance_lock_minutes,
+            attendance_capacity=attendance_capacity
         )
 
         return self.match_repo.update(updated_match)

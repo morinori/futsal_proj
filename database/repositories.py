@@ -11,12 +11,12 @@ class MatchRepository:
     def create(self, match: Match) -> bool:
         """경기 생성"""
         query = """
-            INSERT INTO matches (field_id, match_date, match_time, opponent, result, attendance_lock_minutes)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO matches (field_id, match_date, match_time, opponent, result, attendance_lock_minutes, attendance_capacity)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """
         result = db_manager.execute_query(
             query,
-            (match.field_id, str(match.match_date), match.match_time, match.opponent, match.result, match.attendance_lock_minutes)
+            (match.field_id, str(match.match_date), match.match_time, match.opponent, match.result, match.attendance_lock_minutes, match.attendance_capacity)
         )
         return result is not None and result > 0
 
@@ -110,12 +110,12 @@ class MatchRepository:
         """경기 정보 업데이트"""
         query = """
             UPDATE matches
-            SET field_id = ?, match_date = ?, match_time = ?, opponent = ?, result = ?, attendance_lock_minutes = ?
+            SET field_id = ?, match_date = ?, match_time = ?, opponent = ?, result = ?, attendance_lock_minutes = ?, attendance_capacity = ?
             WHERE id = ?
         """
         result = db_manager.execute_query(
             query,
-            (match.field_id, str(match.match_date), match.match_time, match.opponent, match.result, match.attendance_lock_minutes, match.id)
+            (match.field_id, str(match.match_date), match.match_time, match.opponent, match.result, match.attendance_lock_minutes, match.attendance_capacity, match.id)
         )
         return result is not None and result > 0
 
@@ -616,6 +616,16 @@ class AttendanceRepository:
         """
         results = db_manager.execute_query(query, (match_id,))
         return [dict(row) for row in results] if results else []
+
+    def count_present(self, match_id: int) -> int:
+        """특정 경기의 현재 참석 인원 수"""
+        query = """
+            SELECT COUNT(*) as count
+            FROM attendance
+            WHERE match_id = ? AND status = 'present'
+        """
+        result = db_manager.execute_query(query, (match_id,), fetch_all=False)
+        return result['count'] if result else 0
 
 class AdminRepository:
     """관리자 데이터 액세스"""

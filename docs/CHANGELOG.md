@@ -1,5 +1,25 @@
 # Changelog
 
+## 2025-11-20
+- 경기별 참석 정원 관리 기능 추가로 운영 편의성 향상.
+  - `database/migrations.py`: `matches` 테이블에 `attendance_capacity INTEGER NULL` 컬럼 추가
+  - `database/models.py`: `Match` 모델에 `attendance_capacity` 필드 추가
+  - `database/repositories.py`:
+    - `MatchRepository`: create/update 메서드에 attendance_capacity 반영
+    - `AttendanceRepository`: `count_present(match_id)` 메서드 추가 (참석 인원 카운트)
+    - `attendance(match_id, status)` 복합 인덱스 생성으로 카운트 성능 최적화
+  - `services/match_service.py`: create/update 메서드에 정원 검증 로직 추가 (필수 입력, 1-50명 범위)
+  - `services/attendance_service.py`:
+    - `update_player_status`: 정원 초과 시 일반 사용자 참석 변경 차단
+    - `get_attendance_summary`: capacity, remaining_slots, is_full 정보 추가
+    - 관리자는 `is_admin=True` 플래그로 정원 초과 허용
+  - `ui/pages/schedule.py`: 경기 생성/수정 폼에 "참석 정원" 필수 입력 필드 추가 (기본값: 20명, 범위: 1-50명)
+  - `ui/pages/attendance.py`:
+    - 개인별/경기별 출석 탭 모두에 정원 현황 배지 표시 (예: "🎯 참석 정원: 12/15명 (잔여 3석)")
+    - 정원 마감 시 "⚠️ **정원 마감**" 경고 메시지 + 참석 버튼 비활성화
+    - 출석 상태 변경 응답을 Dict 형태로 처리하여 상세 에러 메시지 제공
+  - RFC 문서: `docs/RFCs/attendance_capacity.md`, `docs/RFCs/attendance_additional_considerations.md` 참조
+
 ## 2025-11-12
 - 출석 응답 상태를 세분화해 무응답 선수를 명확히 구분.
   - `database/repositories.py`: 경기 요약 쿼리를 참석/불참/미정/무응답/총원 집계로 재작성.

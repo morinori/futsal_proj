@@ -79,7 +79,7 @@ class SchedulePage:
 
             # 추가 정보
             st.markdown("**추가 정보**")
-            col3, col4 = st.columns(2)
+            col3, col4, col5 = st.columns(3)
 
             with col3:
                 result = st.text_input("경기 결과 (선택사항)", placeholder="경기 후 입력")
@@ -96,8 +96,24 @@ class SchedulePage:
                 selected_lock = st.selectbox("출석 마감", options=list(lock_options.keys()))
                 attendance_lock_minutes = lock_options[selected_lock]
 
+            with col5:
+                # 참석 정원 선택
+                attendance_capacity = st.number_input(
+                    "참석 정원 (필수)",
+                    min_value=1,
+                    max_value=50,
+                    value=20,
+                    step=1,
+                    help="경기에 참석할 수 있는 최대 인원수 (권장: 20명)"
+                )
+
             if st.form_submit_button("경기 추가", type="primary"):
                 if selected_field and match_date and selected_time:
+                    # 정원 검증
+                    if not attendance_capacity or attendance_capacity < 1:
+                        st.error("참석 정원을 1명 이상으로 설정해주세요.")
+                        return
+
                     try:
                         field_id = field_options[selected_field]
 
@@ -110,7 +126,8 @@ class SchedulePage:
                                 match_date=match_date,
                                 match_time=selected_time,
                                 opponent=opponent or "",
-                                attendance_lock_minutes=attendance_lock_minutes
+                                attendance_lock_minutes=attendance_lock_minutes,
+                                attendance_capacity=attendance_capacity
                             )
 
                             if success:
@@ -372,24 +389,40 @@ class SchedulePage:
 
             # 출석 마감 시간 선택
             st.markdown("**출석 설정**")
-            lock_options = {
-                "제한 없음": 0,
-                "바로 마감": -1,
-                "경기 30분 전": 30,
-                "경기 60분 전": 60,
-                "경기 90분 전": 90
-            }
-            current_lock_minutes = match.get('attendance_lock_minutes', 0)
-            current_lock_label = next((k for k, v in lock_options.items() if v == current_lock_minutes), "제한 없음")
-            current_lock_index = list(lock_options.keys()).index(current_lock_label)
+            col_attendance1, col_attendance2 = st.columns(2)
 
-            selected_lock = st.selectbox(
-                "출석 마감",
-                options=list(lock_options.keys()),
-                index=current_lock_index,
-                key=f"edit_lock_{match['id']}"
-            )
-            attendance_lock_minutes = lock_options[selected_lock]
+            with col_attendance1:
+                lock_options = {
+                    "제한 없음": 0,
+                    "바로 마감": -1,
+                    "경기 30분 전": 30,
+                    "경기 60분 전": 60,
+                    "경기 90분 전": 90
+                }
+                current_lock_minutes = match.get('attendance_lock_minutes', 0)
+                current_lock_label = next((k for k, v in lock_options.items() if v == current_lock_minutes), "제한 없음")
+                current_lock_index = list(lock_options.keys()).index(current_lock_label)
+
+                selected_lock = st.selectbox(
+                    "출석 마감",
+                    options=list(lock_options.keys()),
+                    index=current_lock_index,
+                    key=f"edit_lock_{match['id']}"
+                )
+                attendance_lock_minutes = lock_options[selected_lock]
+
+            with col_attendance2:
+                # 참석 정원 선택
+                current_capacity = match.get('attendance_capacity') or 20
+                attendance_capacity = st.number_input(
+                    "참석 정원 (필수)",
+                    min_value=1,
+                    max_value=50,
+                    value=current_capacity,
+                    step=1,
+                    help="경기에 참석할 수 있는 최대 인원수",
+                    key=f"edit_capacity_{match['id']}"
+                )
 
             # 경기 결과
             st.markdown("**경기 결과**")
@@ -419,6 +452,11 @@ class SchedulePage:
 
             with col_submit1:
                 if st.form_submit_button("💾 저장", type="primary"):
+                    # 정원 검증
+                    if not attendance_capacity or attendance_capacity < 1:
+                        st.error("참석 정원을 1명 이상으로 설정해주세요.")
+                        return
+
                     try:
                         field_id = field_options[selected_field]
 
@@ -441,7 +479,8 @@ class SchedulePage:
                             match_time=selected_time,
                             opponent=opponent or "",
                             result=result or "",
-                            attendance_lock_minutes=attendance_lock_minutes
+                            attendance_lock_minutes=attendance_lock_minutes,
+                            attendance_capacity=attendance_capacity
                         )
 
                         if success:

@@ -78,6 +78,17 @@ def init_complete_db():
             else:
                 raise
 
+        # 경기별 참석 정원 컬럼 추가 (마이그레이션)
+        try:
+            cur.execute("ALTER TABLE matches ADD COLUMN attendance_capacity INTEGER DEFAULT NULL")
+            logger.info("Added attendance_capacity column to matches table")
+        except sqlite3.OperationalError as e:
+            # 컬럼이 이미 존재하는 경우 무시
+            if "duplicate column" in str(e).lower():
+                logger.info("attendance_capacity column already exists")
+            else:
+                raise
+
         # 출석 테이블
         cur.execute("""
             CREATE TABLE IF NOT EXISTS attendance(
@@ -206,6 +217,12 @@ def init_complete_db():
         cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_video_logs_level
             ON video_logs(level);
+        """)
+
+        # 출석 인덱스 (참석자 수 카운트 최적화)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_attendance_match_status
+            ON attendance(match_id, status);
         """)
 
         # 팀 구성 테이블

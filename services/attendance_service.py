@@ -61,17 +61,57 @@ class AttendanceService:
             # 시간 정보가 없거나 오류가 있는 경우 잠금 처리하지 않음
             return False
 
-    def update_player_status(self, match_id: int, player_id: int, status: str) -> bool:
-        """선수 개인의 출석 상태 변경"""
+    def update_player_status(self, match_id: int, player_id: int, status: str, is_admin: bool = False) -> Dict[str, Any]:
+        """선수 개인의 출석 상태 변경
+
+        Returns:
+            Dict with 'success' (bool) and 'message' (str)
+        """
         valid_statuses = ['present', 'absent', 'pending']
         if status not in valid_statuses:
-            raise ValueError(f"잘못된 상태값입니다: {status}")
+            return {'success': False, 'message': f"잘못된 상태값입니다: {status}"}
 
         # 출석 변경이 잠금되었는지 확인
         if self.is_attendance_locked(match_id):
-            return False
+            return {'success': False, 'message': "출석 변경 가능 시간이 지났습니다."}
 
-        return self.attendance_repo.update_status(match_id, player_id, status)
+        # 참석으로 변경하는 경우에만 정원 체크
+        if status == 'present':
+            # 현재 상태 확인 (이미 참석 상태면 정원 체크 불필요)
+            current_attendances = self.attendance_repo.get_by_match(match_id)
+            current_status = None
+            for att in current_attendances:
+                if att['player_id'] == player_id:
+                    current_status = att['status']
+                    break
+
+            # 이미 참석 상태가 아닌 경우에만 정원 체크
+            if current_status != 'present':
+                match = self.match_repo.get_by_id(match_id)
+                if not match:
+                    return {'success': False, 'message': "경기를 찾을 수 없습니다."}
+
+                capacity = match.get('attendance_capacity')
+
+                # 정원이 설정되어 있는 경우
+                if capacity is not None and capacity > 0:
+                    current_count = self.attendance_repo.count_present(match_id)
+
+                    # 정원 초과 체크
+                    if current_count >= capacity:
+                        # 관리자는 정원 초과 허용
+                        if not is_admin:
+                            return {
+                                'success': False,
+                                'message': f"참석 정원이 가득 찼습니다. (현재 {current_count}/{capacity}명)"
+                            }
+
+        success = self.attendance_repo.update_status(match_id, player_id, status)
+
+        if success:
+            return {'success': True, 'message': "출석 상태가 변경되었습니다."}
+        else:
+            return {'success': False, 'message': "출석 상태 변경에 실패했습니다."}
 
     def get_match_attendance(self, match_id: int) -> List[Dict[str, Any]]:
         """경기별 전체 출석 현황 (관리자용)"""
@@ -113,13 +153,25 @@ class AttendanceService:
             summary.get('present', 0) + summary.get('absent', 0) + summary.get('pending', 0)
         )
 
+        # 경기 정보에서 정원 조회
+        match = self.match_repo.get_by_id(match_id)
+        capacity = match.get('attendance_capacity') if match else None
+        remaining_slots = None
+
+        # 정원이 설정되어 있으면 잔여석 계산
+        if capacity is not None and capacity > 0:
+            remaining_slots = max(0, capacity - summary['present'])
+
         return {
             'total_players': total,
             'present_count': summary['present'],
             'absent_count': summary['absent'],
             'pending_count': summary['pending'],
             'unresponded_count': summary.get('unresponded', 0),
-            'present_rate': (summary['present'] / total * 100) if total > 0 else 0
+            'present_rate': (summary['present'] / total * 100) if total > 0 else 0,
+            'capacity': capacity,
+            'remaining_slots': remaining_slots,
+            'is_full': (capacity is not None and capacity > 0 and summary['present'] >= capacity)
         }
 
     def _get_status_display(self, status: str) -> str:
