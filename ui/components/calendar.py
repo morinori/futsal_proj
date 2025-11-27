@@ -192,17 +192,24 @@ class CalendarComponent:
 
         # 모바일 감지는 CSS 미디어 쿼리로 자동 처리 (iframe 없음)
 
-        # 현재 달의 경기 데이터 가져오기
+        # 현재 달력 초기 위치 설정
         today = datetime.now()
-        year = st.session_state.get('calendar_year', today.year)
-        month = st.session_state.get('calendar_month', today.month)
+        current_year = st.session_state.get('calendar_year', today.year)
+        current_month = st.session_state.get('calendar_month', today.month)
 
-        # 경기 데이터를 가져와서 달력 이벤트로 변환
-        matches = self.match_service.get_monthly_matches(year, month)
+        # 🆕 전체 범위의 경기 데이터 가져오기 (±1년)
+        # 이렇게 하면 달력의 prev/next 버튼으로 이동해도 경기가 보임!
+        start_date = date(today.year - 1, 1, 1)
+        end_date = date(today.year + 1, 12, 31)
+
+        matches = self.match_service.get_matches_in_range(start_date, end_date)
         calendar_events = self._create_mobile_optimized_events(matches, is_mobile=False)
 
         # 반응형 캘린더 옵션 (CSS로 처리)
         calendar_options = self._get_adaptive_calendar_options(is_mobile=False)
+
+        # 🆕 달력 초기 표시 날짜를 현재 세션 상태로 설정
+        calendar_options["initialDate"] = f"{current_year}-{current_month:02d}-01"
 
         # 모바일 최적화 CSS
         mobile_css = self._get_mobile_optimized_css()
@@ -218,8 +225,12 @@ class CalendarComponent:
         # 이벤트 처리
         self._handle_calendar_events(calendar_result, is_mobile=False)
 
-        # 이번 달 경기 요약 정보
-        self._render_match_summary(matches, is_mobile=False)
+        # 🆕 현재 월의 경기만 필터링하여 요약 정보 표시
+        current_month_matches = [
+            m for m in matches
+            if m['match_date'].startswith(f"{current_year}-{current_month:02d}")
+        ]
+        self._render_match_summary(current_month_matches, is_mobile=False)
 
     def _create_mobile_optimized_events(self, matches: List[Dict[str, Any]], is_mobile: bool = False) -> List[Dict[str, Any]]:
         """모바일 최적화된 캘린더 이벤트 생성"""

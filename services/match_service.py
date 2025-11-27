@@ -72,6 +72,10 @@ class MatchService:
         """월별 경기 목록"""
         return self.match_repo.get_for_month(year, month)
 
+    def get_matches_in_range(self, start_date: date, end_date: date) -> List[Dict[str, Any]]:
+        """날짜 범위로 경기 조회 - 달력 전체 범위 로드용"""
+        return self.match_repo.get_in_date_range(start_date, end_date)
+
     def get_monthly_count(self) -> int:
         """이번 달 경기 수"""
         return self.match_repo.get_monthly_count()

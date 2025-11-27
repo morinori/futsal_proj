@@ -44,6 +44,18 @@ class MatchRepository:
         results = db_manager.execute_query(query, (str(year), f"{month:02d}"))
         return [dict(row) for row in results] if results else []
 
+    def get_in_date_range(self, start_date: date, end_date: date) -> List[Dict[str, Any]]:
+        """날짜 범위로 경기 조회 - 달력 전체 범위 로드용"""
+        query = """
+            SELECT m.*, f.name as field_name, f.address as field_address
+            FROM matches m
+            LEFT JOIN fields f ON m.field_id = f.id
+            WHERE m.match_date BETWEEN ? AND ?
+            ORDER BY m.match_date, m.match_time
+        """
+        results = db_manager.execute_query(query, (str(start_date), str(end_date)))
+        return [dict(row) for row in results] if results else []
+
     def get_next_match(self) -> Optional[Dict[str, Any]]:
         """다음 경기 조회"""
         query = """

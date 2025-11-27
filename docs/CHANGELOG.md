@@ -1,5 +1,53 @@
 # Changelog
 
+## 2025-11-27
+- **달력 월 이동 기능 구현 완료 (대안 방식)**
+  - RFC: `docs/RFCs/streamlit-calendar-dateset-bridge.md` 목표 달성 (다른 방식)
+  - 목표: 달력의 prev/next 버튼으로 월 이동 시 경기가 즉시 표시
+  - 결과: ✅ **구현 성공** (범위 쿼리 방식)
+  - 핵심 아이디어:
+    - RFC 원안: datesSet 이벤트로 월 변경 감지 → Python이 새 데이터 전송 (통신 필요)
+    - 실제 구현: ±1년 범위 데이터를 초기에 한 번에 전송 → FullCalendar가 클라이언트 사이드 필터링 (통신 불필요)
+  - 코드 변경:
+    - `database/repositories.py`: `MatchRepository.get_in_date_range(start_date, end_date)` 메서드 추가 (날짜 범위 쿼리)
+    - `services/match_service.py`: `get_matches_in_range(start_date, end_date)` 메서드 추가 (범위 쿼리 래핑)
+    - `ui/components/calendar.py`:
+      - 기존 `get_monthly_matches(year, month)` 대신 `get_matches_in_range(2024-01-01, 2026-12-31)` 사용
+      - 모든 경기를 FullCalendar에 전달, 클라이언트 사이드에서 자동 필터링
+      - `initialDate`로 현재 월 표시, prev/next 클릭 시 즉시 해당 월 경기 표시
+  - 성능 측정 (실제 Docker 환경):
+    - 현재 12경기: 0.08ms 쿼리, 1.5KB 메모리, 5KB 브라우저 전송
+    - 3년 150경기: 1.00ms 쿼리, 18.75KB 메모리, 65KB 브라우저 전송
+    - 10년 500경기: 3.33ms 쿼리, 62.50KB 메모리, 218KB 브라우저 전송
+    - 비교: jQuery.js(90KB), 평균 웹 이미지(100-500KB)보다 작음
+  - 장점:
+    - ✅ 포크/빌드 불필요
+    - ✅ Python-Calendar 통신 불필요
+    - ✅ 무한루프 리스크 없음
+    - ✅ RFC 원안보다 더 빠름 (1회 쿼리 vs 월마다 쿼리)
+    - ✅ 유지보수 용이
+  - 브라우저 테스트 검증:
+    - November 2025 (4경기) → October 2025 (5경기) → September 2025 (6경기) 모두 즉시 표시 확인
+    - prev/next 버튼 정상 작동, Python rerun 없이 클라이언트 사이드 렌더링
+
+## 2025-11-25
+- **RFC 종료: 달력 월 이동 기능 구현 불가 판정**
+  - RFC: `docs/RFCs/calendar-multi-month-view.md`
+  - 목표: 달력의 prev/next 버튼으로 월 이동 시 경기 목록도 함께 업데이트
+  - 결과: ❌ **구현 불가** (기술적 제약)
+  - 근거:
+    - `streamlit-calendar` 라이브러리가 prev/next 버튼 클릭 이벤트를 Streamlit Python 코드로 전달하지 않음
+    - 작동하는 콜백: `eventClick`, `dateClick`만 확인
+    - 미작동 콜백: `datesSet`, `eventsSet` (설정해도 `calendar_result`에 포함 안 됨)
+    - 달력 내부 상태(현재 표시 중인 월)를 Python에서 읽을 방법 없음
+  - 시도한 방안:
+    1. datesSet/eventsSet 콜백 활성화 → 실패
+    2. dateClick의 view 정보 활용 → prev/next 버튼에서는 미발생
+    3. 동적 key를 통한 컴포넌트 재마운트 → 트리거 부재
+    4. Streamlit 버튼으로 네비게이션 추가 → 기술적으로 작동하나 RFC 요구사항과 다름
+  - 대안: 월 이동이 필요한 경우 "일정 관리" 페이지의 월별 필터 사용
+  - 코드 변경: 없음 (원상 복구됨)
+
 ## 2025-11-20
 - 경기별 참석 정원 관리 기능 추가로 운영 편의성 향상.
   - `database/migrations.py`: `matches` 테이블에 `attendance_capacity INTEGER NULL` 컬럼 추가
@@ -18,7 +66,7 @@
     - 개인별/경기별 출석 탭 모두에 정원 현황 배지 표시 (예: "🎯 참석 정원: 12/15명 (잔여 3석)")
     - 정원 마감 시 "⚠️ **정원 마감**" 경고 메시지 + 참석 버튼 비활성화
     - 출석 상태 변경 응답을 Dict 형태로 처리하여 상세 에러 메시지 제공
-  - RFC 문서: `docs/RFCs/attendance_capacity.md`, `docs/RFCs/attendance_additional_considerations.md` 참조
+  - ADR 문서: `docs/ADRs/2025-11-20-attendance-capacity.md` 참조
 
 ## 2025-11-12
 - 출석 응답 상태를 세분화해 무응답 선수를 명확히 구분.
