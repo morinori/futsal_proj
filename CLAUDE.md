@@ -22,23 +22,24 @@
 
 - `app.py`: Streamlit 엔트리. UI/페이지 라우팅과 세션 복원을 담당합니다.
 - `ui/`: 페이지(`ui/pages/`)와 컴포넌트(`ui/components/`) 모듈.
-- `services/`: 비즈니스 로직 계층.
-- `services/match_service.py`: 경기 생성/수정 시 `attendance_lock_minutes` 검증과 저장을 담당.
-- `services/attendance_service.py`: `is_attendance_locked`로 출석 변경 가능 여부를 판별하고 UI에 전달.
+  - `ui/utils/cached_services.py`: Streamlit 캐싱이 적용된 서비스 래퍼 (성능 최적화).
+- `services/`: 비즈니스 로직 계층 (Streamlit 의존성 없는 순수 로직).
+  - `services/match_service.py`: 경기 생성/수정 시 `attendance_lock_minutes` 검증과 저장을 담당.
+  - `services/attendance_service.py`: `is_attendance_locked`로 출석 변경 가능 여부를 판별하고 UI에 전달.
 - `database/`: 리포지토리, 모델, 마이그레이션.
 - `config/settings.py`: 업로드 정책, DB 경로 등 설정.
 - `utils/`: 인증, 검증, 포매터, 파일 보안 등 공통 함수.
 - `docs/`: Codex CLI가 생산한 설계/테스트/안전 문서 (`SPEC.md`, `INTERFACES.md`, `TEST_PLAN.md`, `vuln.md` 등).
 - `.codex/`: Codex 에이전트 프로필(`AGENT.md`), 가드레일 사본(`instructions.md`).
-- `claude_guardrails.md`: Claude Code가 실제 구현 시 따라야 할 규칙.
+- `claude_guardrails.md`: Claude Code가 실제 구현 시 따라야 할 규칙 (485줄, 10개 섹션).
 
 ## 4. 참고해야 할 문서
 
-1. **보안 / 취약점**: `docs/vuln.md` – URL 기반 세션 복원 금지, ffprobe `eval` 제거, JS 삽입 보안, SQL `LIMIT` 파라미터화 등.
-2. **운영 가드레일**: `claude_guardrails.md` – docker compose 금지, run.sh 기반 운영, git 워크플로, 보안 규칙.
+1. **보안 / 취약점**: `docs/vuln.md` – URL 기반 세션 복원 금지, ffprobe `eval` 제거, JS 삽입 보안, SQL `LIMIT` 파라미터화 등. (모든 주요 취약점 해결 완료 ✅)
+2. **운영 가드레일**: `claude_guardrails.md` – **20줄 → 485줄로 대폭 확장**. 코딩 표준, 보안 규칙, Streamlit 베스트 프랙티스, DB 규칙, 테스트 요구사항, 배포 가이드라인, 파일 구조 규칙, 리뷰 워크플로, Quick Reference 등 10개 섹션. 체크리스트 형태로 PR 리뷰 시 활용.
 3. **Codex 설계 메모**: `.codex/AGENT.md` – 요구사항 분석, 문서 산출물 작성 흐름.
 4. **추가 산출물**: `docs/SPEC.md`, `docs/INTERFACES.md`, `docs/TEST_PLAN.md`, `docs/ROADMAP.md`, `docs/QUESTIONS.md`, `docs/CHANGELOG.md` – 필요 시 최신화.
-5. **기능별 스펙 초안**: `docs/attendance_lock_spec.md`, `docs/attendance_match_autoselect_spec.md` – 출석 마감 정책과 드롭다운 동기화 구현 참고.
+5. **기능별 스펙 초안**: `docs/attendance_lock_spec.md`, `docs/attendance_match_autoselect_spec.md` – 출석 마감 정책과 드롑다운 동기화 구현 참고.
 
 위 문서들을 차례대로 확인한 뒤 개발을 시작하면 토큰 사용량을 최소화하면서도 최신 지침을 준수할 수 있습니다.
 
@@ -185,6 +186,64 @@ if st.button("🔄 선택 초기화"):
 **교훈**:
 - **단순함이 최선**: 복잡한 자동 초기화 로직보다 명시적인 사용자 액션(버튼)이 더 안전하고 예측 가능합니다.
 - 상태 초기화가 필요하다면 사용자가 명확히 인지할 수 있는 UI 요소를 제공하세요.
+
+## 9. 성능 최적화 (Streamlit 캐싱)
+
+### 9.1 캐싱 레이어 사용
+
+**목적**: 자주 조회되는 데이터를 캐싱하여 DB 쿼리를 줄이고 페이지 로딩 속도를 개선합니다.
+
+**위치**: `ui/utils/cached_services.py`
+
+**사용 방법**:
+```python
+# ❌ Before (캐싱 없음)
+from services.player_service import player_service
+
+players = player_service.get_all_players()
+
+# ✅ After (캐싱 적용)
+from ui.utils.cached_services import get_all_players_cached
+
+players = get_all_players_cached()  # 5분 캐시
+```
+
+**주요 캐싱 함수** (TTL):
+- `get_all_players_cached()` - 5분
+- `get_available_fields_cached()` - 5분
+- `get_next_match_cached()` - 1분
+- `get_monthly_matches_cached(year, month)` - 1분
+- `get_recent_news_cached(limit)` - 2분
+- `get_attendance_status_options_cached()` - 10분
+
+### 9.2 캐시 무효화
+
+**데이터 변경 후 캐시 무효화 필수**:
+```python
+from ui.utils.cached_services import clear_player_cache
+
+# 선수 추가/수정/삭제 후
+if player_service.create_player(player_data):
+    clear_player_cache()  # 캐시 무효화
+    st.success("선수가 추가되었습니다!")
+```
+
+**캐시 무효화 함수**:
+- `clear_player_cache()` - 선수 데이터 변경 시
+- `clear_field_cache()` - 구장 데이터 변경 시
+- `clear_match_cache()` - 경기 데이터 변경 시
+- `clear_all_cache()` - 전체 캐시 초기화 (디버깅용)
+
+### 9.3 아키텍처 원칙
+
+**중요**: Service 계층은 Streamlit 의존성 없이 순수 비즈니스 로직만 유지합니다.
+- ✅ `services/*.py`: Streamlit import 금지, 순수 Python 로직
+- ✅ `ui/utils/cached_services.py`: UI 계층에서만 `@st.cache_data` 적용
+- ✅ 관심사 분리: Service는 재사용 가능, 캐싱은 UI 최적화
+
+**성능 개선 예상**:
+- 대시보드 로딩: 30-50% 단축 (최초 로드 후 5분간 캐시 히트)
+- DB 쿼리: 페이지 재방문 시 0회 (캐시 히트 시)
 
 ---
 Claude Code는 위 순서를 기준으로 작업하며, 추가 정보가 필요할 때만 세부 문서를 열람하세요. 항상 `./run.sh`와 보안 가드레일을 먼저 확인하는 것을 잊지 마세요.

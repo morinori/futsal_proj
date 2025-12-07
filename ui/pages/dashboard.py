@@ -2,13 +2,14 @@
 import streamlit as st
 from ui.components.calendar import calendar_component
 from ui.components.metrics import metrics_component
-from services.news_service import news_service
+from ui.utils.cached_services import (
+    get_recent_news_cached,
+    get_monthly_match_count_cached,
+    get_total_players_count_cached,
+)
 
 class DashboardPage:
     """메인 대시보드 페이지"""
-
-    def __init__(self):
-        self.news_service = news_service
 
     def render(self) -> None:
         """대시보드 렌더링"""
@@ -39,7 +40,7 @@ class DashboardPage:
         st.header("📰 최신 소식")
 
         try:
-            recent_news = self.news_service.get_recent_news(3)
+            recent_news = get_recent_news_cached(3)
 
             if recent_news:
                 for news in recent_news:
@@ -112,12 +113,9 @@ class DashboardPage:
         with col1:
             st.subheader("📈 이번 달 활동")
 
-            # 간단한 진행 상황
-            from services.match_service import match_service
-            from services.player_service import player_service
-
-            monthly_matches = match_service.get_monthly_count()
-            total_players = player_service.get_total_count()
+            # 간단한 진행 상황 (캐시됨)
+            monthly_matches = get_monthly_match_count_cached()
+            total_players = get_total_players_count_cached()
 
             # 진행률 바
             st.markdown("**경기 활동**")

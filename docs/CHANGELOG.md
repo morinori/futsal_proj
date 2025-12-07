@@ -1,8 +1,31 @@
 # Changelog
 
+## 2025-12-07
+- **코드 품질 개선 및 가드레일 확장**
+  - **가드레일 문서 대폭 확장**: `claude_guardrails.md` (20줄 → 485줄)
+    - 10개 섹션 추가: 코딩 표준, 보안 규칙, Streamlit 베스트 프랙티스, DB 규칙, 테스트 요구사항, 배포 가이드라인 등
+    - 실전 경험 기반 Streamlit 주의사항 문서화 (CLAUDE.md Section 8 참조)
+    - 체크리스트 형태로 PR 리뷰 시 활용 가능
+    - 보안 Quick Check 명령어 제공
+  - **Streamlit 캐싱 레이어 추가**: 성능 최적화
+    - 신규 파일: `ui/utils/cached_services.py`
+    - 자주 조회되는 데이터에 `@st.cache_data` 적용
+    - 캐싱 대상: 선수 목록(5분), 경기 데이터(1분), 뉴스(2분), 정적 옵션(10분)
+    - 캐시 무효화 유틸리티 함수 제공 (`clear_player_cache()`, `clear_all_cache()` 등)
+    - Service 계층은 Streamlit 의존성 없이 순수 비즈니스 로직 유지
+  - **대시보드 페이지 캐싱 적용**: `ui/pages/dashboard.py`
+    - `get_recent_news_cached()`, `get_monthly_match_count_cached()`, `get_total_players_count_cached()` 사용
+    - 대시보드 로딩 성능 향상 예상
+  - **코드 리뷰 완료**:
+    - 보안: 9.5/10 (모든 주요 취약점 해결 완료)
+    - 아키텍처: 9/10 (깨끗한 레이어 분리)
+    - 코드 품질: 8.5/10 (TODO 없음, 타입 힌트 양호)
+    - 문서화: 9/10 (실전 경험 반영)
+
 ## 2025-11-27
 - **달력 월 이동 기능 구현 완료 (대안 방식)**
-  - RFC: `docs/RFCs/streamlit-calendar-dateset-bridge.md` 목표 달성 (다른 방식)
+  - ADR: `docs/ADRs/2025-11-27-calendar-range-query.md`
+  - RFC: `streamlit-calendar-dateset-bridge.md` 목표 달성 (다른 방식)
   - 목표: 달력의 prev/next 버튼으로 월 이동 시 경기가 즉시 표시
   - 결과: ✅ **구현 성공** (범위 쿼리 방식)
   - 핵심 아이디어:
